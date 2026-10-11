@@ -14,6 +14,9 @@ export interface MuseumDiagnostics {
   pulseCount: number;
   signalEnergy: number;
   layerRms: number[];
+  trailFrames: number;
+  feedbackFrames: number;
+  feedbackSize: number[];
   error?: string;
 }
 declare global { interface Window { __treeMuseum?: MuseumDiagnostics } }
@@ -22,7 +25,7 @@ const vertex = `#version 300 es
 in vec2 aPosition;
 out vec2 uv;
 void main() { uv = aPosition * .5 + .5; gl_Position = vec4(aPosition, 0., 1.); }`;
-const fragment = `#version 300 es
+const shaderCommon = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 color;
@@ -30,95 +33,116 @@ uniform sampler2D milk0;
 uniform sampler2D milk1;
 uniform sampler2D milk2;
 uniform sampler2D signalField;
+uniform sampler2D sharedField;
 uniform float clock;
 uniform float position;
 uniform float aspect;
 const float PI = 3.14159265;
-float loopDistance(float a, float b) { return mod(a-b+3.,6.)-3.; }
-float trunk(float y) { return .32*sin(y*PI/3.+.4) + .15*sin(y*PI+clock*.07); }
-vec3 sampleLayer(int layer, vec2 coord) {
-  // Mirror the sampling domain to soften texture edges under mutual displacement.
-  vec2 reflected = 1.-abs(mod(coord,2.)-1.);
+float loopDistance(float a,float b) { return mod(a-b+3.,6.)-3.; }
+float trunk(float y) { return .32*sin(y*PI/3.+.4)+.15*sin(y*PI+clock*.07); }
+vec3 sampleLayer(int layer,vec2 coord) {
+  vec2 reflected=1.-abs(mod(coord,2.)-1.);
   if(layer==0) return texture(milk0,reflected).rgb;
   if(layer==1) return texture(milk1,reflected).rgb;
   return texture(milk2,reflected).rgb;
 }
-vec3 layerTint(int layer) {
-  return layer==0 ? vec3(.47,.26,1.) : layer==1 ? vec3(.08,.4,1.) : vec3(1.,.43,.26);
-}
-void main() {
-  vec2 p = vec2((uv.x-.5)*max(3.9,aspect*3.25), (1.-uv.y)*6.+position);
-  float y = mod(p.y,6.);
-  float x = p.x;
-  float stem = trunk(y);
-  vec4 signal = texture(signalField,vec2(y/6.,.5));
-  float waveform = (signal.r*2.-1.)*.24 + (signal.g*2.-1.)*.06;
-  float pulse = signal.b;
-  float stemDist = abs(x-stem);
-  float mainGlow = exp(-stemDist*stemDist*110.);
-  float halo = exp(-stemDist*stemDist*5.);
-  vec3 result = vec3(.001,.002,.006);
-  for(int j=0;j<3;j++) {
-    float node = 1.+float(j)*2.;
-    float dy = loopDistance(y,node);
-    float origin = trunk(node);
-    float dx = x-origin;
-    float radius = length(vec2(dx,dy*.85));
-    float angle = atan(dy,dx);
-    vec2 sampleUV = vec2(.5) + vec2(cos(angle+radius*.9+clock*.035),sin(angle+radius*.9+clock*.035))*radius*.19;
-    sampleUV += vec2(.035*sin(y*(2.*PI/3.)+clock*.08), clock*.005);
-    int previousLayer = (j+2)%3;
-    int nextLayer = (j+1)%3;
-    vec3 previousMilk = sampleLayer(previousLayer,sampleUV*.93+vec2(.025,.018));
-    vec3 nextMilk = sampleLayer(nextLayer,sampleUV*.93-vec2(.025,.018));
-    float previousLight = dot(previousMilk,vec3(.3,.5,.2));
-    float nextLight = dot(nextMilk,vec3(.3,.5,.2));
-    float overlap = exp(-dy*dy*.3);
-    // Each live neighbor displaces this layer, rather than only adding an independent glow.
-    sampleUV += vec2(previousLight-nextLight,previousLight+nextLight-.5)*(.026+.02*pulse)*overlap;
-    vec3 milk = sampleLayer(j,sampleUV);
-    float lum = dot(milk,vec3(.3,.5,.2));
-    vec3 tint = layerTint(j);
-    float branch = 0.;
-    float fine = 0.;
-    for(int b=0;b<18;b++) {
-      float side = mod(float(b),2.)*2.-1.;
-      float n = floor(float(b)*.5)/8.;
-      float reach = max(0.,dx*side);
-      float growth = pow(reach,.68);
-      float direction = j==2 ? 1. : -1.;
-      float curve = direction*growth*(.45+n*1.12);
-      curve += .065*sin(reach*5.+n*9.+clock*.15)*reach;
-      float d = abs(dy-curve);
-      float domain = smoothstep(0.,.12,reach)*exp(-reach*.43)*(1.-smoothstep(2.2,2.85,abs(dy)));
-      branch += exp(-d*d*1000.)*domain;
-      fine += exp(-d*d*32.)*domain;
+vec3 tint(int layer) { return layer==0?vec3(.48,.3,1.):layer==1?vec3(.09,.46,1.):vec3(.94,.48,.37); }
+float worldWidth() { return max(3.9,aspect*3.25); }
+vec2 branching(vec2 p) {
+  float broad=0., crisp=0.;
+  for(int nodeIndex=0;nodeIndex<3;nodeIndex++) {
+    float node=1.+float(nodeIndex)*2.;
+    float dy=loopDistance(p.y,node);
+    float dx=p.x-trunk(node);
+    float direction=nodeIndex==2?1.:-1.;
+    for(int branchIndex=0;branchIndex<4;branchIndex++) {
+      float side=mod(float(branchIndex),2.)*2.-1.;
+      float reach=max(0.,dx*side);
+      float slope=.64+floor(float(branchIndex)/2.)*.61;
+      float curve=direction*pow(reach,.68)*slope+.042*sin(reach*5.+float(nodeIndex)*2.+clock*.09)*reach;
+      float distance=abs(dy-curve);
+      float domain=smoothstep(0.,.1,reach)*exp(-reach*.4)*(1.-smoothstep(2.25,2.8,abs(dy)));
+      broad+=exp(-distance*distance*10.)*domain;
+      crisp+=exp(-distance*distance*1600.)*domain;
     }
-    // The real preset texture fills the branches; stable filaments provide spatial continuity.
-    float nodeMask = exp(-dy*dy*.58);
-    float textureMask = min(1.,fine*.28 + halo*.7)*nodeMask;
-    result += tint*(branch*.44*(.6+lum*1.6)+mainGlow*.36*nodeMask);
-    vec3 ownLight = mix(tint*lum,milk*tint,.4);
-    vec3 neighboringLight = previousMilk*layerTint(previousLayer)+nextMilk*layerTint(nextLayer);
-    result += mix(ownLight,neighboringLight*.5,.17*overlap)*textureMask*.92;
-    result += tint*halo*nodeMask*.024;
-    // Small luminous eddies curl around each meeting point.
-    float spiralLine = pow(max(0.,sin(angle*5.-radius*22.+clock*.22)),18.);
-    result += tint*spiralLine*exp(-radius*3.2)*(.15+lum*.7);
-    result += mix(tint,vec3(.8,.88,1.),.65)*exp(-radius*radius*190.)*.58;
   }
-  float filaments = pow(max(0.,sin((x-stem)*84.+sin(y*(8.*PI/3.)+clock*.4)*1.5)),14.);
-  result += vec3(.16,.32,.75)*filaments*exp(-stemDist*stemDist*18.)*.12;
-  // A visible virtual waveform: the shared signed stereo synthesis also feeds MilkDrop.
-  float waveDistance = abs(x-stem-waveform);
-  vec3 spineColor = mix(vec3(.27,.5,1.),vec3(.95,.83,1.),.45+pulse*.4);
-  result += spineColor*exp(-waveDistance*waveDistance*6500.)*(.34+pulse*2.2);
-  result += vec3(.2,.38,.9)*exp(-waveDistance*waveDistance*210.)*(.055+pulse*.48);
-  float vignette = (1.-smoothstep(.24,.78,abs(uv.x-.5)));
-  result *= vignette;
-  result = 1.-exp(-result*1.3);
-  color = vec4(result,1.);
-}`;
+  return vec2(min(1.,broad*.48),min(1.,crisp));
+}
+vec3 paletteAt(float y) {
+  vec3 w=vec3(exp(-pow(loopDistance(y,1.),2.)*.65),exp(-pow(loopDistance(y,3.),2.)*.65),exp(-pow(loopDistance(y,5.),2.)*.65))+.04;
+  w/=dot(w,vec3(1.));
+  return tint(0)*w.x+tint(1)*w.y+tint(2)*w.z;
+}
+`;
+const feedbackFragment = shaderCommon + `
+uniform float feedbackDelta;
+uniform float freshField;
+void main() {
+  float y=uv.y*6.;
+  float x=(uv.x-.5)*worldWidth();
+  float stem=trunk(y);
+  vec2 coordinate=vec2(.5+(x-stem)*.21,.5+.28*sin(y*PI/3.));
+  coordinate+=vec2(.09*sin(y*PI/3.+clock*.055),.04*cos(y*2.*PI/3.-clock*.04));
+  vec3 probe0=sampleLayer(0,coordinate);
+  vec3 probe1=sampleLayer(1,coordinate+vec2(.13,.17));
+  vec3 probe2=sampleLayer(2,coordinate-vec2(.11,.19));
+  // One common displacement field, derived from every live preset, steers all of them.
+  vec2 flow=(vec2(probe0.r-probe1.b,probe1.g-probe2.r)+vec2(probe2.b-probe0.g,probe0.b-probe2.g))*.052;
+  flow+=vec2(sin(y*PI/3.+clock*.06),cos(y*2.*PI/3.-clock*.04))*.018;
+  vec2 displaced=coordinate+flow;
+  vec3 weights=vec3(exp(-pow(loopDistance(y,1.),2.)*.23),exp(-pow(loopDistance(y,3.),2.)*.23),exp(-pow(loopDistance(y,5.),2.)*.23))+.18;
+  weights/=dot(weights,vec3(1.));
+  vec3 a=sampleLayer(0,displaced);
+  vec3 b=sampleLayer(1,displaced+vec2(.13,.17));
+  vec3 c=sampleLayer(2,displaced-vec2(.11,.19));
+  float luminance=dot(a,vec3(.3,.5,.2))*weights.x+dot(b,vec3(.3,.5,.2))*weights.y+dot(c,vec3(.3,.5,.2))*weights.z;
+  // Strong source contrast preserves moving MilkDrop detail; color is anchored to the shared tree palette.
+  float detail=pow(clamp(luminance*1.45,0.,1.),.78);
+  vec3 palette=paletteAt(y);
+  vec2 limbs=branching(vec2(x,y));
+  float reach=abs(x-stem);
+  float silhouette=min(1.,limbs.x+exp(-reach*reach*10.)*.75);
+  vec3 injected=palette*detail*silhouette*.96;
+  injected+=palette*exp(-reach*reach*65.)*.035;
+  vec2 advected=vec2(clamp(uv.x-flow.x*feedbackDelta*.28,0.,1.),fract(uv.y-(.035+flow.y*.35)*feedbackDelta));
+  vec3 previous=texture(sharedField,advected).rgb;
+  float retention=freshField>0.5?0.:exp(-feedbackDelta*3.8);
+  // Convex, time-scaled mixing cannot amplify its own output into uncontrolled white feedback.
+  color=vec4(clamp(previous*retention+injected*(1.-retention),0.,1.),1.);
+}
+`;
+const fragment = shaderCommon + `
+void main() {
+  float y=mod((1.-uv.y)*6.+position,6.);
+  float x=(uv.x-.5)*worldWidth();
+  float stem=trunk(y);
+  vec3 result=texture(sharedField,vec2(uv.x,y/6.)).rgb+vec3(.001,.002,.006);
+  // A sparse contour gives the tree structure without the old repeated fan of eighteen rails per layer.
+  vec2 limbs=branching(vec2(x,y));
+  result+=paletteAt(y)*limbs.y*.105;
+  result+=paletteAt(y)*exp(-pow(x-stem,2.)*100.)*.048;
+  // Historical rows are actual immutable audio-source windows, not re-evaluated oscillators.
+  for(int row=11;row>=1;row--) {
+    float age=float(row)*.06;
+    float trailingY=mod(y-age*.45+6.,6.);
+    vec4 past=texture(signalField,vec2(trailingY/6.,(float(row)+.5)/16.));
+    float waveform=(past.r*2.-1.)*.24+(past.g*2.-1.)*.06;
+    float ghostDistance=abs(x-stem-waveform-age*.028);
+    float fade=exp(-age*2.5)*past.a;
+    vec3 ghostColor=mix(vec3(.19,.33,.82),vec3(.64,.42,1.),age/.66);
+    result+=ghostColor*exp(-ghostDistance*ghostDistance*6500.)*(.028+past.b*.72)*fade;
+    result+=ghostColor*exp(-ghostDistance*ghostDistance*210.)*past.b*.045*fade;
+  }
+  vec4 signal=texture(signalField,vec2(y/6.,.5/16.));
+  float waveform=(signal.r*2.-1.)*.24+(signal.g*2.-1.)*.06;
+  float waveDistance=abs(x-stem-waveform);
+  vec3 spineColor=mix(vec3(.27,.5,1.),vec3(.95,.83,1.),.45+signal.b*.4);
+  result+=spineColor*exp(-waveDistance*waveDistance*6500.)*(.34+signal.b*2.2)*signal.a;
+  result+=vec3(.2,.38,.9)*exp(-waveDistance*waveDistance*210.)*(.055+signal.b*.48)*signal.a;
+  result*=1.-smoothstep(.24,.78,abs(uv.x-.5));
+  color=vec4(1.-exp(-result*1.3),1.);
+}
+`;
 
 export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error: string) => void) {
   const diagnostics: MuseumDiagnostics = {
@@ -126,6 +150,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     presets: ['Flexi + Martin - astral projection', 'Geiss - Spiral Artifact', 'Flexi + Martin - cascading decay swing'],
     frames: 0, milkFrames: 0, position: 0, paused: false,
     gestureCount: 0, pulseCount: 0, signalEnergy: 0, layerRms: [0,0,0],
+    trailFrames: 0, feedbackFrames: 0, feedbackSize: [],
   };
   window.__treeMuseum = diagnostics;
   const context = canvas.getContext('webgl2', { alpha: false, antialias: false, powerPreference: 'high-performance' });
@@ -137,15 +162,23 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     if (!gl!.getShaderParameter(value, gl!.COMPILE_STATUS)) throw new Error(gl!.getShaderInfoLog(value) || 'Shader compile failed');
     return value;
   }
-  const program = gl.createProgram()!;
-  const vs = shader(gl.VERTEX_SHADER, vertex), fs = shader(gl.FRAGMENT_SHADER, fragment);
-  gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) || 'Shader link failed');
-  gl.useProgram(program);
+  const vs=shader(gl.VERTEX_SHADER,vertex);
+  const shaders: WebGLShader[]=[vs];
+  function makeProgram(source: string) {
+    const program=gl.createProgram()!, fs=shader(gl.FRAGMENT_SHADER,source);shaders.push(fs);
+    gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'aPosition');gl.linkProgram(program);
+    if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program)||'Shader link failed');
+    gl.useProgram(program);
+    for(let i=0;i<3;i++) gl.uniform1i(gl.getUniformLocation(program,`milk${i}`),i);
+    gl.uniform1i(gl.getUniformLocation(program,'signalField'),3);
+    gl.uniform1i(gl.getUniformLocation(program,'sharedField'),4);
+    return program;
+  }
+  const program=makeProgram(fragment), feedbackProgram=makeProgram(feedbackFragment);
   const buffer = gl.createBuffer()!;
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-  const attrib = gl.getAttribLocation(program,'aPosition');
+  const attrib = 0;
   gl.enableVertexAttribArray(attrib); gl.vertexAttribPointer(attrib,2,gl.FLOAT,false,0,0);
   const sources = [astral,spiral,cascade].map((preset, index) => {
     const source = document.createElement('canvas');
@@ -159,7 +192,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.uniform1i(gl.getUniformLocation(program,`milk${index}`),index);
+
     return {source,visualizer,texture};
   });
   const sampleCount = 1024;
@@ -170,9 +203,9 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  gl.uniform1i(gl.getUniformLocation(program,'signalField'),3);
-  const signalPixels = new Uint8Array(sampleCount*4);
-  interface SignalFrame { time: number; left: Float32Array; right: Float32Array }
+  const traceRows=16;
+  const signalPixels=new Uint8Array(sampleCount*traceRows*4);
+  interface SignalFrame { time: number; left: Float32Array; right: Float32Array; envelope: Float32Array }
   interface Pulse { born: number; origin: number; amplitude: number; speed: number; width: number; phase: number; harmonic: number }
   const pulses: Pulse[] = [];
   const history: SignalFrame[] = [];
@@ -185,7 +218,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   const wrap = (value: number) => ((value%6)+6)%6;
   const byte = (value: number) => Math.max(0,Math.min(255,Math.round(128+value*127)));
   function synthesize(now: number): SignalFrame {
-    const left = new Float32Array(sampleCount), right = new Float32Array(sampleCount);
+    const left = new Float32Array(sampleCount), right = new Float32Array(sampleCount), envelopes=new Float32Array(sampleCount);
     let energy = 0;
     for(let i=0;i<sampleCount;i++) {
       const y = i/sampleCount*6;
@@ -207,12 +240,34 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       left[i] = Math.tanh(a*(1+gestureEnergy*.28));
       right[i] = Math.tanh(b*(1+gestureEnergy*.28));
       energy += left[i]*left[i]+right[i]*right[i];
-      signalPixels[i*4] = byte(left[i]);signalPixels[i*4+1] = byte(right[i]);
-      signalPixels[i*4+2] = Math.round(Math.min(1,envelope)*255);signalPixels[i*4+3] = 255;
+      envelopes[i]=Math.min(1,envelope);
     }
     diagnostics.signalEnergy = Math.sqrt(energy/(sampleCount*2));
     diagnostics.pulseCount = pulses.length;
-    return {time:now,left,right};
+    return {time:now,left,right,envelope:envelopes};
+  }
+  function uploadTraces() {
+    signalPixels.fill(0);
+    const latest=history[history.length-1];
+    if(latest) for(let row=0;row<traceRows;row++) {
+      const at=latest.time-row*.06;
+      if(at<history[0].time) continue;
+      let older=history[0], newer=latest;
+      for(let h=history.length-1;h>=0;h--) if(history[h].time<=at) {
+        older=history[h];newer=history[Math.min(h+1,history.length-1)];break;
+      }
+      const amount=newer.time===older.time?0:(at-older.time)/(newer.time-older.time);
+      for(let i=0;i<sampleCount;i++) {
+        const offset=(row*sampleCount+i)*4;
+        signalPixels[offset]=byte(older.left[i]+(newer.left[i]-older.left[i])*amount);
+        signalPixels[offset+1]=byte(older.right[i]+(newer.right[i]-older.right[i])*amount);
+        signalPixels[offset+2]=Math.round((older.envelope[i]+(newer.envelope[i]-older.envelope[i])*amount)*255);
+        signalPixels[offset+3]=255;
+      }
+    }
+    gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,signalTexture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,sampleCount,traceRows,0,gl.RGBA,gl.UNSIGNED_BYTE,signalPixels);
+    diagnostics.trailFrames=history.length;
   }
   function driveLayer(index: number, now: number) {
     // Delays read an immutable shared snapshot; filters belong to each destination only.
@@ -232,20 +287,43 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   function clearExcitation() {
     pulses.length=0;history.length=0;gestureEnergy=0;lastPulse=-1;
     filters.forEach(filter=>{filter.left.fill(0);filter.right.fill(0);});
-    diagnostics.pulseCount=0;
+    diagnostics.pulseCount=0;uploadTraces();
   }
-  const timeUniform = gl.getUniformLocation(program,'clock');
-  const positionUniform = gl.getUniformLocation(program,'position');
-  const aspectUniform = gl.getUniformLocation(program,'aspect');
+  const fieldWidth=matchMedia('(max-width: 700px)').matches?256:512;
+  const fieldHeight=matchMedia('(max-width: 700px)').matches?512:768;
+  diagnostics.feedbackSize=[fieldWidth,fieldHeight];
+  const fields=[0,1].map(()=>{
+    const texture=gl.createTexture()!, framebuffer=gl.createFramebuffer()!;
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,fieldWidth,fieldHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Shared flow framebuffer unavailable');
+    return {texture,framebuffer};
+  });
+  let readField=0, fieldReady=false;
   let previous = performance.now(), time = 0, lastMilk = -1, request = 0, disposed = false;
   let target = 0, current = 0, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function clearFields() {
+    gl.clearColor(0,0,0,1);
+    for(const field of fields) {gl.bindFramebuffer(gl.FRAMEBUFFER,field.framebuffer);gl.clear(gl.COLOR_BUFFER_BIT);}
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);fieldReady=false;readField=0;
+  }
+  function bindPass(pass: WebGLProgram) {
+    gl.useProgram(pass);
+    sources.forEach(({texture},index)=>{gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,texture);});
+    gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,signalTexture);
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,fields[readField].texture);
+    gl.uniform1f(gl.getUniformLocation(pass,'clock'),time);
+    gl.uniform1f(gl.getUniformLocation(pass,'aspect'),innerWidth/innerHeight);
+    gl.uniform1f(gl.getUniformLocation(pass,'position'),current);
+  }
   const resize = () => {
-    const dpr = Math.min(devicePixelRatio,1.5);
-    const maxWidth = 1920;
-    const scale = Math.min(dpr,maxWidth/innerWidth);
-    canvas.width = Math.round(innerWidth*scale); canvas.height = Math.round(innerHeight*scale);
-    gl.viewport(0,0,canvas.width,canvas.height);
-    gl.uniform1f(aspectUniform,innerWidth/innerHeight);
+    const scale=Math.min(devicePixelRatio,1.5,1920/innerWidth);
+    canvas.width=Math.round(innerWidth*scale);canvas.height=Math.round(innerHeight*scale);
+    // Aspect changes alter world x extent, so old accumulation is deliberately cleared.
+    clearFields();
   };
   resize(); addEventListener('resize',resize);
   const fail = (error: unknown) => {
@@ -265,13 +343,11 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       if (Math.abs(target-current)<.00001 && Math.abs(target)>600) { current=((current%6)+6)%6; target=current; }
       diagnostics.position=((current%6)+6)%6; diagnostics.paused=paused;
       try {
-        const signal = synthesize(time);
-        gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,signalTexture);
-        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,sampleCount,1,0,gl.RGBA,gl.UNSIGNED_BYTE,signalPixels);
         if (lastMilk<0 || (!paused && time-lastMilk>1/30)) {
           const elapsed = lastMilk<0 ? 1/30 : Math.min(.1,time-lastMilk);
-          history.push(signal);
-          while(history.length>32) history.shift();
+          history.push(synthesize(time));
+          while(history.length>64) history.shift();
+          uploadTraces();
           sources.forEach(({source,visualizer,texture},index)=>{
             driveLayer(index,time);
             visualizer.render({audioLevels,elapsedTime:elapsed*.55});
@@ -280,7 +356,16 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
           });
           diagnostics.milkFrames++; lastMilk=time;
         }
-        gl.useProgram(program);gl.uniform1f(timeUniform,time);gl.uniform1f(positionUniform,current);
+        if(!fieldReady || !paused) {
+          const writeField=1-readField;
+          gl.bindFramebuffer(gl.FRAMEBUFFER,fields[writeField].framebuffer);
+          gl.viewport(0,0,fieldWidth,fieldHeight);bindPass(feedbackProgram);
+          gl.uniform1f(gl.getUniformLocation(feedbackProgram,'feedbackDelta'),dt);
+          gl.uniform1f(gl.getUniformLocation(feedbackProgram,'freshField'),fieldReady?0:1);
+          gl.drawArrays(gl.TRIANGLES,0,6);readField=writeField;fieldReady=true;diagnostics.feedbackFrames++;
+        }
+        // Camera motion is applied only here; feedback and trace history remain in world coordinates.
+        gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);bindPass(program);
         gl.drawArrays(gl.TRIANGLES,0,6);diagnostics.frames++;
       } catch(error) { fail(error); return; }
     }
@@ -303,13 +388,14 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       }
     },
     get position() { return diagnostics.position; },
-    setPaused(value: boolean) { if(value && !paused) clearExcitation(); paused=value; diagnostics.paused=value; },
-    reset() { target=0; clearExcitation(); },
+    setPaused(value: boolean) { paused=value; diagnostics.paused=value; },
+    reset() { target=0; clearExcitation(); clearFields(); lastMilk=-1; },
     dispose() {
       disposed=true;cancelAnimationFrame(request);removeEventListener('resize',resize);canvas.removeEventListener('webglcontextlost',lost);
       sources.forEach(({source,texture})=>{gl.deleteTexture(texture); source.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();});
       gl.deleteTexture(signalTexture);
-      gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);
+      fields.forEach(({texture,framebuffer})=>{gl.deleteTexture(texture);gl.deleteFramebuffer(framebuffer);});
+      gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteProgram(feedbackProgram);shaders.forEach(value=>gl.deleteShader(value));
     },
   };
 }
