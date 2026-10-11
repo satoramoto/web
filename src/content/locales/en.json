@@ -81,5 +81,35 @@
       "label": "Booking",
       "book": "Book The Band"
     }
+  },
+  "museum": {
+    "documentTitle": "Tree of Life — A living museum",
+    "label": "Tree of Life, an immersive project museum",
+    "heading": "Tree of Life",
+    "projects": "Explore the projects",
+    "scroll": "Scroll to wander",
+    "pause": "Pause motion",
+    "resume": "Resume motion",
+    "reset": "Return to the beginning",
+    "close": "Close project details",
+    "repository": "Explore the repository",
+    "visit": "Visit the band",
+    "returnHint": "Escape to return to the current",
+    "error": "The live visualizer is unavailable. The projects are still open to explore.",
+    "flow": {
+      "title": "Open Flow",
+      "medium": "Visual instruments",
+      "description": "A visual system for exploring music through motion. Open Flow brings MilkDrop presets and visual rendering tools into an open-source playground."
+    },
+    "blackhole": {
+      "title": "BlackHole",
+      "medium": "Sound into light",
+      "description": "A macOS music visualizer built around Butterchurn and the MilkDrop preset library. It turns stereo audio into shifting fields of colour and motion."
+    },
+    "astronaut": {
+      "title": "Funkadelic Astronaut",
+      "medium": "Future rock",
+      "description": "A New Jersey future rock trio. Songs, live performances and a world of sound built around the band."
+    }
   }
 }

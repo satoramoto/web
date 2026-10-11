@@ -37,7 +37,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        home: 'index.html'
+        home: 'index.html',
+        museum: 'museum/index.html'
       }
     }
   },

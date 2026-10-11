@@ -7,7 +7,7 @@ How to work in this repo: where things go, which tests to run, what CI runs and 
 | Folder | What it is | Storybook title |
 | --- | --- | --- |
 | `src/site/` | The public site, funkadelicastronaut.com: `main.tsx`, `PressKit/` | **Site / ...** (e.g. Site / Press Kit) |
-| `src/experience/` | The desk experience, Storybook only, not deployed: `Arrival/`, `Desk/`, `Poster/`, `sections/`, `experiments/`, `debug/` | **Experience / ...** |
+| `src/experience/` | The desk experience, Storybook only, plus the separate `/museum/` POC in `TreeMuseum/`: `Arrival/`, `Desk/`, `Poster/`, `sections/`, `experiments/`, `debug/` | **Experience / ...** |
 | `src/content/` | Band data as TypeScript (links, members, releases, live set, stages) and `locales/en.json`, the copy catalogue. No CSS, no components. | — |
 | `src/components`, `src/behaviors`, `src/foundations`, `src/styles`, `src/geometry` | Shared library | **Library / Components / 2D/...**, **Library / Components / 3D/...**, **Library / Foundations / ...** |
 | `legacy/` | The old vanilla-JS poster with its scripts, styles and `legacy/tests/`; kept, not deployed, not served by `npm run dev` | — |

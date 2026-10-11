@@ -11,6 +11,10 @@ npm run dev
 
 This serves the site at http://127.0.0.1:4173/ and Storybook at http://127.0.0.1:4173/storybook/ from one origin, with hot reload. Ports, labels and running several worktrees side by side are covered in [docs/local-preview.md](docs/local-preview.md). Never use Python's HTTP server for the development preview. Test commands and when to run them are in [AGENTS.md](AGENTS.md).
 
+## Tree of Life prototype
+
+The independent `/museum/` entry is an immersive portfolio proof of concept. Three live Butterchurn presets fill a stable branching WebGL2 composition. Wheel, touch or arrow/Page keys move through a circular world; the project titles open accessible detail dialogs. Pause, reset and reduced-motion support are included. This silent demo uses synthetic audio samples, with no microphone or audio-device permissions. It does not change the band homepage. Implementation and rendering limits are in [docs/tree-museum.md](docs/tree-museum.md).
+
 ## How it deploys
 
 Pushes to `main` run `.github/workflows/pages.yml`: `npm test` (which also runs the legacy poster's tests), then `npm run build` (which copies `assets/` alongside the bundle), then the built `dist/` is published to GitHub Pages (custom domain funkadelicastronaut.com, DNS at Namecheap). Built pages link their files relatively (`base: './'`), so the same build works at the domain root or any subpath. Pull requests run `.github/workflows/ci.yml`: `npm test` and `npm run build`, `npm run build-storybook`, and `npm run test:stories`.
