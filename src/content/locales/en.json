@@ -161,7 +161,7 @@
     },
     "journey": {
       "chapters": "Repository chapters",
-      "public": "{count} public repositories",
+      "public": "{{count}} public repositories",
       "repository": "Repository",
       "fork": "Fork",
       "archived": "Archived",

@@ -13,7 +13,7 @@ export const chapters = repositorySnapshot.groups.map((group, chapterIndex) => {
   return { owner: group.owner, count: group.count, worldY, projects };
 });
 export const projects = chapters.flatMap(chapter => chapter.projects);
-export const journeyLength = cursor + 2;
+export const journeyLength = Math.ceil((cursor + 2) / viewportLength) * viewportLength;
 export const wrapJourney = (worldY: number) => ((worldY % journeyLength) + journeyLength) % journeyLength;
 // Smooth periodic centerline, shared by native waveform and repository attachments.
 export function spinePathX(worldY: number) {

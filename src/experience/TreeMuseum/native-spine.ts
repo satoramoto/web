@@ -1,3 +1,4 @@
+import { spinePathX, viewportLength } from './journey';
 import type { ThemeId } from './themes';
 
 type Values=Record<string,number>;
@@ -6,6 +7,12 @@ interface AuthoredPart {baseVals:Values;init_eqs_str?:string;frame_eqs_str?:stri
 interface AuthoredPreset extends AuthoredPart {pixel_eqs_str?:string;shapes:AuthoredPart[];waves:AuthoredPart[];warp:string;comp:string}
 export interface NativeSpineInput {
   samples:Int8Array;envelope:Float32Array;time:number;position:number;worldWidth:number;theme:ThemeId;injecting:boolean;onDeposit:()=>void;
+}
+export function nativeSpineX(samples:Int8Array,worldY:number,worldWidth:number) {
+  const phase=((worldY%viewportLength)+viewportLength)%viewportLength;
+  const sample=phase/viewportLength*samples.length,index=Math.floor(sample)%samples.length,next=(index+1)%samples.length,fraction=sample-Math.floor(sample);
+  const signed=(samples[index]*(1-fraction)+samples[next]*fraction)/128;
+  return .5+(spinePathX(worldY)+signed*.65)/worldWidth;
 }
 const compile=(source=''):Equation=>new Function('a',`${source}; return a;`) as Equation;
 export function createNativeSpinePreset(authored:unknown) {
@@ -38,10 +45,9 @@ export function installNativeSpine(gl:WebGL2RenderingContext,renderer:NativeStag
     const colors:Record<ThemeId,number[]>={prism:[.4,.6,1],garden:[.3,.86,.66],horizon:[.72,.5,1]},color=colors[input.theme];
     for(let i=0;i<=input.samples.length;i++){
       const screenY=i/input.samples.length*6,y=((screenY+input.position)%6+6)%6;
-      const sample=y/6*input.samples.length,index=Math.floor(sample)%input.samples.length,next=(index+1)%input.samples.length,fraction=sample-Math.floor(sample);
-      const signed=(input.samples[index]*(1-fraction)+input.samples[next]*fraction)/128;
+
       // Native comp flips framebuffer UV.y; deposit bottom-up so displayed s=0 is the top.
-      points[i*5]=2*signed*.65/input.worldWidth;points[i*5+1]=2*screenY/6-1;
+      points[i*5]=2*nativeSpineX(input.samples,screenY+input.position,input.worldWidth)-1;points[i*5+1]=2*screenY/6-1;
       for(let channel=0;channel<3;channel++)points[i*5+2+channel]=color[channel]+input.envelope[Math.floor(y/6*input.envelope.length)%input.envelope.length]*.08;
     }
     const previousVao=gl.getParameter(gl.VERTEX_ARRAY_BINDING),previousProgram=gl.getParameter(gl.CURRENT_PROGRAM),previousBuffer=gl.getParameter(gl.ARRAY_BUFFER_BINDING);

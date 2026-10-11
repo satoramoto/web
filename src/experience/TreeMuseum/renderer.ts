@@ -1,8 +1,9 @@
+import { journeyLength, viewportLength, wrapJourney } from './journey';
 import butterchurn from 'butterchurn';
 import { createPerformanceMonitor, type MuseumPerformance } from './performance';
 import { themes, initialTheme, type ThemeId } from './themes';
 import { createQualityController, qualityTiers, type QualityStatus } from './quality';
-import { createNativeSpinePreset, installNativeSpine, type NativeSpineInput } from './native-spine';
+import { createNativeSpinePreset, installNativeSpine, nativeSpineX, type NativeSpineInput } from './native-spine';
 
 export interface MuseumDiagnostics {
   renderer:string; theme:ThemeId; presets:string[]; quality:QualityStatus; frames:number; milkFrames:number;
@@ -130,6 +131,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     nativeGl.clearColor(0,0,0,1);for(const target of targets){nativeGl.bindFramebuffer(nativeGl.FRAMEBUFFER,target);nativeGl.clear(nativeGl.COLOR_BUFFER_BIT);}
     nativeGl.bindFramebuffer(nativeGl.FRAMEBUFFER,previous);
   }
+  const depositedSamples=new Int8Array(spine.samples.length);let depositedPosition=0,depositedWidth=spine.worldWidth;
   const disposeSpine=installNativeSpine(nativeGl,visualizer.renderer,spine);
   let goodPreset:unknown=themes[themeIndex].preset;
   let renderFailed=false,goodName=themes[themeIndex].name as string;
@@ -170,17 +172,18 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
       const submittedAt=performance.now();perf?.startFrame(now,paused);
       if(!paused){time+=dt;gestureEnergy*=Math.exp(-dt*2.4);for(let i=pulses.length-1;i>=0;i--)if(time-pulses[i].born>7)pulses.splice(i,1);}
       current+=(target-current)*Math.min(1,dt*9);
-      if(Math.abs(target-current)<.00001&&Math.abs(target)>600){current=wrap(current);target=current;}
-      diagnostics.position=wrap(current);diagnostics.paused=paused;
+      if(Math.abs(target-current)<.00001&&Math.abs(target)>600){current=wrapJourney(current);target=current;}
+      diagnostics.position=wrapJourney(current);diagnostics.paused=paused;
       try {
         if(qualityChanged) applyQuality();
         if(lastSignal<0||(!paused&&time-lastSignal>=1/60-.0004)){history.push(synthesize(time));uploadSignal();lastSignal=time;}
-        if(!renderFailed&&(lastRender<0||(!paused&&time-lastRender>=1/tier.cadence-.0007))) {
+        if(!renderFailed&&(lastRender<0||Math.abs(current-spine.position)>.0001||(!paused&&time-lastRender>=1/tier.cadence-.0007))) {
           const elapsed=lastRender<0?1/tier.cadence:Math.min(.1,time-lastRender);
           spine.position=current;visualizer.render({audioLevels,elapsedTime:elapsed});lastRender=time;
           if(pendingPreset){goodPreset=pendingPreset.preset;goodName=pendingPreset.name;pendingPreset.resolve();pendingPreset=null;}
           diagnostics.nativeBands={bass:visualizer.renderer.audioLevels.bass,mid:visualizer.renderer.audioLevels.mid,treble:visualizer.renderer.audioLevels.treb};
-          diagnostics.nativeFrames=visualizer.renderer.frameNum;diagnostics.nativePosition=wrap(spine.position);diagnostics.milkFrames++;diagnostics.waveformFeedTime=spine.time;
+          diagnostics.nativeFrames=visualizer.renderer.frameNum;depositedSamples.set(spine.samples);depositedPosition=wrapJourney(spine.position);depositedWidth=spine.worldWidth;
+          diagnostics.nativePosition=depositedPosition;diagnostics.milkFrames++;diagnostics.waveformFeedTime=spine.time;
           gl.bindTexture(gl.TEXTURE_2D,texture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,source);
         }
         perf?.beginGpu();gl.useProgram(program);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);
@@ -199,7 +202,10 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
       if(lastPulse<0||time-lastPulse>.14){pulses.push({born:time,origin:wrap(current+2.1),amplitude:.35+Math.min(.45,Math.abs(bounded)*.8)+random()*.12,
         speed:1.2+random()*.65,width:.18+random()*.16,phase:random()*Math.PI*2,harmonic:10+Math.floor(random()*12)});if(pulses.length>10)pulses.shift();lastPulse=time;}
     },
-    get position(){return diagnostics.position;},
+    get position(){return depositedPosition;},
+    get journeyLength(){return journeyLength;},
+    getSpinePoint(worldY:number){return {x:nativeSpineX(depositedSamples,worldY,depositedWidth),y:wrapJourney(worldY-depositedPosition)/viewportLength};},
+    jump(worldY:number){target=wrapJourney(worldY);lastRender=-1;},
     setPaused(value:boolean){paused=value;diagnostics.paused=value;},
     setInjecting(value:boolean){spine.injecting=value;diagnostics.injecting=value;},
     setTheme(value:ThemeId){if(diagnostics.theme===value&&diagnostics.presets[0]===themes.find(theme=>theme.id===value)?.name)return;themeIndex=themes.findIndex(theme=>theme.id===value);diagnostics.theme=value;diagnostics.presets=[themes[themeIndex].name];loadTheme();lastRender=-1;quality.suspend();},
