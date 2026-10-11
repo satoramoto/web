@@ -99,4 +99,6 @@ function TreeMuseum() {
     </dialog>
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<TreeMuseum />);
+const root = createRoot(document.getElementById('root')!);
+root.render(<TreeMuseum />);
+if (import.meta.hot) import.meta.hot.dispose(() => root.unmount());
