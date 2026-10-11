@@ -104,10 +104,10 @@ void main() {
   float radius=length(p), angle=atan(p.y,p.x);
   vec2 coordinate;
   if(theme==0) {
-    // Fold polar space into twelve moving mirror sectors: bright source geometry stays intact.
-    float folded=abs(mod(angle+clock*.11,PI/3.)-PI/6.);
-    coordinate=.5+vec2(cos(folded*6.),sin(folded*6.))*radius*.32;
-    coordinate+=vec2(.08*sin(clock*.17),y/3.+signedWave*.32);
+    // Prism uses an elongated spine-local strip, not a radial fan: rapid detail varies across the normal.
+    // Slowly changing tangent coordinates let the native mandala's RGB geometry run along the line.
+    coordinate=vec2(.5+abs(dx)*.72+signedWave*.08,
+      .5+.12*sin(y*PI/3.)+signedWave*.025+clock*.015);
   } else if(theme==1) {
     coordinate=vec2(.5+dx*.31+signedWave*.2,.5+.43*sin(y*PI/3.)+signedWave*.36);
     coordinate+=vec2(sin(y*PI+clock*.23),cos(x*2.3-clock*.19))*.14;
@@ -117,7 +117,7 @@ void main() {
     coordinate+=vec2(.06*sin(y*PI),.08*cos(y*2.*PI/3.));
   }
   // Quarter-turn the live source in the spine-local frame: long crests follow y, not outward x.
-  coordinate=.5+vec2(.5-coordinate.y,coordinate.x-.5);
+  if(theme!=0) coordinate=.5+vec2(.5-coordinate.y,coordinate.x-.5);
   vec3 probe0=sampleLayer(0,coordinate);
   vec3 probe1=sampleLayer(1,coordinate+vec2(.13,.17));
   vec3 probe2=sampleLayer(2,coordinate-vec2(.11,.19));
@@ -147,13 +147,13 @@ void main() {
   vec3 injected=clamp(detail*min(1.6,emission),0.,1.);
   // Backtrace away from the same signed sample position. Old emission travels out into quiet space.
   float side=dx/sqrt(dx*dx+.003);
-  float outward=theme==2?2.2:theme==0?1.65:1.1;
+  float outward=theme==2?2.2:theme==0?.85:1.1;
   // A broad secant follows the curved line without turning individual carrier wiggles into jets.
   vec4 above=signalAt(y+.24,0.), below=signalAt(y-.24,0.);
   float slope=clamp((spineAt(y+.24,above)-spineAt(y-.24,below))/.48,-.7,.7);
   vec2 normal=normalize(vec2(1.,-slope));
   vec2 tangent=vec2(-normal.y,normal.x);
-  vec2 worldVelocity=normal*(side*outward)+tangent*(.06+signedWave*.08);
+  vec2 worldVelocity=normal*(side*outward)+tangent*((theme==0?.18:.06)+signedWave*.08);
   vec2 velocity=worldVelocity/vec2(worldWidth(),6.);
   velocity+=(normal*flow.x+tangent*flow.y)*(theme==1?.18:.09);
   vec2 advected=vec2(clamp(uv.x-velocity.x*feedbackDelta,0.,1.),fract(uv.y-velocity.y*feedbackDelta));
