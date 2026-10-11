@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { t } from '../../i18n/copy';
 import { createMuseumRenderer } from './renderer';
 import type { MuseumPerformance } from './performance';
+import { themes, initialTheme, type ThemeId } from './themes';
 import './museum.css';
 
 const projects = [
@@ -13,6 +14,8 @@ const projects = [
 
 function TreeMuseum() {
   const perfEnabled=new URLSearchParams(location.search).get('perf')==='1';
+  const [theme,setTheme]=useState<ThemeId>(initialTheme);
+  const themeButtons=useRef<(HTMLButtonElement|null)[]>([]);
   const [perf,setPerf]=useState<MuseumPerformance|null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useRef<ReturnType<typeof createMuseumRenderer> | null>(null);
@@ -27,7 +30,7 @@ function TreeMuseum() {
     document.title=t('museum.documentTitle');
     let labelsFrame=0, previousPosition=-1;
     const perfTimer=perfEnabled?window.setInterval(()=>setPerf(window.__treeMuseum?.performance||null),1000):0;
-    try { renderer.current=createMuseumRenderer(canvas.current!,()=>setError(true)); }
+    try { renderer.current=createMuseumRenderer(canvas.current!,()=>setError(true),theme); }
     catch { setError(true); }
     const updateLabels = () => {
       const position=renderer.current?.position || 0;
@@ -69,6 +72,11 @@ function TreeMuseum() {
       removeEventListener('wheel',wheel);removeEventListener('touchstart',touchStart);removeEventListener('touchmove',touchMove);removeEventListener('keydown',key);
     };
   },[]);
+  useEffect(()=>{
+    renderer.current?.setTheme(theme);
+    try {localStorage.setItem('treeMuseum.theme',theme);} catch { /* Storage can be disabled. */ }
+    const url=new URL(location.href);url.searchParams.set('theme',theme);history.replaceState(null,'',url);
+  },[theme]);
   useEffect(()=>{renderer.current?.setPaused(paused||active!==null);},[paused,active]);
   useEffect(()=>{
     const element=dialog.current;
@@ -79,12 +87,13 @@ function TreeMuseum() {
   const close=()=>{const previous=active;setActive(null);if(previous!==null) requestAnimationFrame(()=>labels.current[previous]?.focus());};
   return <main className="tree-museum" aria-label={t('museum.label')}>
     <canvas ref={canvas} className="museum-canvas" aria-hidden="true" />
-    {perfEnabled && perf && <output id="museum-performance" className="museum-performance" aria-label={t('museum.perf.label')} data-fps={perf.fps.toFixed(1)} data-raf-p95-ms={perf.rafP95Ms.toFixed(2)} data-cpu-p95-ms={perf.cpuP95Ms.toFixed(2)} data-compositor-gpu-ms={perf.compositorGpuMs?.toFixed(2)||'unavailable'}>
+    {perfEnabled && perf && <output id="museum-performance" className="museum-performance" aria-label={t('museum.perf.label')} data-quality={window.__treeMuseum?.quality.tier} data-quality-transitions={window.__treeMuseum?.quality.transitions} data-fps={perf.fps.toFixed(1)} data-raf-p95-ms={perf.rafP95Ms.toFixed(2)} data-cpu-p95-ms={perf.cpuP95Ms.toFixed(2)} data-compositor-gpu-ms={perf.compositorGpuMs?.toFixed(2)||'unavailable'}>
       <span>{t('museum.perf.timing',{fps:perf.fps.toFixed(1),raf:perf.rafP95Ms.toFixed(2)})}</span>
       <span>{t('museum.perf.cpu',{mean:perf.cpuMeanMs.toFixed(2),p95:perf.cpuP95Ms.toFixed(2)})}</span>
       <span>{perf.compositorGpuMs===null?t('museum.perf.gpuUnavailable'):t('museum.perf.gpu',{ms:perf.compositorGpuMs.toFixed(2)})}</span>
       <span>{t('museum.perf.size',{canvas:perf.canvas.join(' × '),field:perf.field.join(' × ')})}</span>
       <span>{t('museum.perf.context',{power:perf.requestedPower})} · {t(perf.paused?'museum.perf.paused':'museum.perf.running')}</span>
+      <span>{t('museum.perf.quality',{tier:window.__treeMuseum?.quality.tier||'high',reason:t(`museum.perf.qualityReasons.${window.__treeMuseum?.quality.reason||'warmup'}`),changes:String(window.__treeMuseum?.quality.transitions||0)})}</span>
       <span>{perf.renderer}</span>
     </output>}
     <div className="museum-grain" aria-hidden="true" />
@@ -92,6 +101,12 @@ function TreeMuseum() {
     <div className="museum-controls">
       <button type="button" aria-label={t(paused?'museum.resume':'museum.pause')} title={t(paused?'museum.resume':'museum.pause')} aria-pressed={paused} onClick={()=>setPaused(!paused)}>{paused?<span aria-hidden="true">▷</span>:<span aria-hidden="true">Ⅱ</span>}</button>
       <button type="button" aria-label={t('museum.reset')} title={t('museum.reset')} onClick={()=>renderer.current?.reset()}><span aria-hidden="true">↺</span></button>
+    </div>
+    <div className="museum-themes" role="toolbar" aria-label={t('museum.themes.label')}>
+      {themes.map((item,index)=><button key={item.id} ref={button=>{themeButtons.current[index]=button;}} type="button" aria-pressed={theme===item.id} onClick={()=>setTheme(item.id)} onKeyDown={event=>{
+        const next=event.key==='ArrowRight'?(index+1)%themes.length:event.key==='ArrowLeft'?(index+themes.length-1)%themes.length:event.key==='Home'?0:event.key==='End'?themes.length-1:-1;
+        if(next<0) return;event.preventDefault();event.stopPropagation();setTheme(themes[next].id);themeButtons.current[next]?.focus();
+      }}>{t(item.label)}</button>)}
     </div>
     <nav className="museum-projects" aria-label={t('museum.projects')}>
       {projects.map((project,index)=><button className={`museum-project museum-project-${index}`} key={project.id} ref={element=>{labels.current[index]=element;}} type="button" style={{top:`${(1+index*2)/6*100}%`}} onClick={()=>setActive(index)} aria-haspopup="dialog">

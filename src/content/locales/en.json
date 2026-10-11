@@ -120,7 +120,21 @@
       "size": "Canvas {{canvas}} · field {{field}} · mesh 24 × 18",
       "context": "WebGL2 · requested {{power}}",
       "paused": "Paused",
-      "running": "Running"
+      "running": "Running",
+      "quality": "Quality {{tier}} · {{reason}} · {{changes}} transitions",
+      "qualityReasons": {
+        "warmup": "warming up",
+        "override": "query override",
+        "holding": "holding",
+        "slow": "sustained slow frames",
+        "headroom": "sustained headroom"
+      }
+    },
+    "themes": {
+      "label": "Visual theme",
+      "prism": "Prism Temple",
+      "garden": "Liquid Garden",
+      "horizon": "Event Horizon"
     }
   }
 }

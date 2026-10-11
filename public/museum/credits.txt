@@ -4,6 +4,12 @@ Butterchurn 2.6.7 by Jordan Berg: https://github.com/jberg/butterchurn
 Preset package: butterchurn-presets 2.4.7
 
 Preset authors and original names:
+Phat+fiShbRaiN+Eo.S_Mandala_Chasers_remix
+Martin - acid wiring
+Eo.S. - glowsticks v2 05 and proton lights (+Krash′s beat code) _Phat_remix02b
+Geiss - Reaction Diffusion 2
+Flexi - alien fish pond
+Cope - The Neverending Explosion of Red Liquid Fire
 Flexi + Martin - astral projection
 Geiss - Spiral Artifact
 Flexi + Martin - cascading decay swing

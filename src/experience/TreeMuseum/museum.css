@@ -14,3 +14,5 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 .museum-performance{position:absolute;left:16px;bottom:18px;z-index:3;display:flex;flex-direction:column;gap:4px;max-width:calc(100% - 32px);padding:12px 14px;background:#050713d9;color:#cbd7f0;border:1px solid #39446c;font:11px/1.4 monospace;pointer-events:none;overflow-wrap:anywhere}
+
+.museum-themes{position:absolute;bottom:61px;left:50%;transform:translateX(-50%);display:flex;gap:5px;z-index:2;padding:5px;background:#02030b85;border-radius:22px;backdrop-filter:blur(8px)}.museum-themes button{padding:9px 12px;border:1px solid transparent;border-radius:18px;background:transparent;color:#aaa8bc;font-size:10px;letter-spacing:.05em;white-space:nowrap}.museum-themes button[aria-pressed=true]{color:#fff;border-color:#b6a1ef66;background:#49415b55}.museum-themes button:hover{color:#fff}.museum-themes button:focus-visible{outline-offset:2px}@media(max-width:700px){.museum-themes{bottom:53px;gap:0}.museum-themes button{font-size:9px;padding:9px 9px}}
