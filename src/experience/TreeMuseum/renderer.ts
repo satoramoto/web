@@ -7,7 +7,7 @@ import { createNativeSpinePreset, installNativeSpine, type NativeSpineInput } fr
 export interface MuseumDiagnostics {
   renderer:string; theme:ThemeId; presets:string[]; quality:QualityStatus; frames:number; milkFrames:number;
   position:number;paused:boolean;gestureCount:number;pulseCount:number;signalEnergy:number;trailFrames:number;
-  nativeFrames:number;nativePosition:number;nativeDeposits:number;nativeWavePoints:number;nativeTargetBound:boolean;nativeSize:number[];injecting:boolean;
+  nativeBands:{bass:number;mid:number;treble:number};nativeFrames:number;nativePosition:number;nativeDeposits:number;nativeWavePoints:number;nativeTargetBound:boolean;nativeSize:number[];injecting:boolean;
   waveformFeed:string;waveformFeedTime:number;performance?:MuseumPerformance;error?:string;
 }
 declare global {interface Window {__treeMuseum?:MuseumDiagnostics}}
@@ -16,16 +16,14 @@ in vec2 aPosition;out vec2 uv;
 void main(){uv=aPosition*.5+.5;gl_Position=vec4(aPosition,0.,1.);}`;
 const fragment=`#version 300 es
 precision highp float;in vec2 uv;out vec4 color;
-uniform sampler2D nativeField;uniform sampler2D spineSignal;uniform float position;uniform float worldWidth;uniform float signalTime;uniform float pixelWidth;uniform float injecting;
+uniform sampler2D nativeField;uniform sampler2D spineSignal;uniform float position;uniform float worldWidth;
 void main(){
   float y=mod((1.-uv.y)*6.+position,6.);float v=y/6.;
   vec3 field=texture(nativeField,vec2(uv.x,1.-uv.y)).rgb;
-  float trunk=.32*sin(y*3.14159265/3.+.4)+.15*sin(y*3.14159265+signalTime*.07);
-  float sampleValue=(texture(spineSignal,vec2(v+.5/1024.,.5)).r*255.-128.)/127.;
-  float distance=abs((uv.x-.5)*worldWidth-(trunk+sampleValue*.3));
+  float sampleValue=(texture(spineSignal,vec2(v+.5/512.,.5)).r*255.-128.)/128.;
+  float distance=abs((uv.x-.5)*worldWidth-sampleValue*.65);
   float exposure=.90*(.10+.90*exp(-.85*distance));
-  float core=1.-smoothstep(pixelWidth*.45,pixelWidth*.95,distance);
-  color=vec4(mix(field*exposure,vec3(.88,.94,1.),core*.9*injecting),1.);
+  color=vec4(field*exposure,1.);
 }`;
 
 export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:string)=>void,selectedTheme:ThemeId=initialTheme()) {
@@ -33,8 +31,8 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
   const quality=createQualityController();let tier=qualityTiers[quality.status.tier];
   const diagnostics:MuseumDiagnostics={renderer:'Butterchurn2.6.7 / native waveform-stage feedback',theme:selectedTheme,presets:[themes[themeIndex].name],quality:quality.status,
     frames:0,milkFrames:0,position:0,paused:false,gestureCount:0,pulseCount:0,signalEnergy:0,trailFrames:0,
-    nativeFrames:0,nativePosition:0,nativeDeposits:0,nativeWavePoints:1025,nativeTargetBound:false,nativeSize:[tier.source,tier.source],injecting:true,
-    waveformFeed:'Canonical mono samples deposited at native basic-wave stage into targetTexture',waveformFeedTime:0};
+    nativeBands:{bass:0,mid:0,treble:0},nativeFrames:0,nativePosition:0,nativeDeposits:0,nativeWavePoints:513,nativeTargetBound:false,nativeSize:[tier.source,tier.source],injecting:true,
+    waveformFeed:'One mono input; native FFT bands and native512 timeArrayL waveform deposited into targetTexture',waveformFeedTime:0};
   window.__treeMuseum=diagnostics;
   const context=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance'});
   if(!context) throw new Error('WebGL2 is unavailable');const gl=context;
@@ -45,7 +43,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
   const vs=shader(gl.VERTEX_SHADER,vertex),fs=shader(gl.FRAGMENT_SHADER,fragment),program=gl.createProgram()!;
   gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'aPosition');gl.linkProgram(program);
   if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program)||'Shader link failed');
-  gl.useProgram(program);gl.uniform1i(gl.getUniformLocation(program,'nativeField'),0);const positionUniform=gl.getUniformLocation(program,'position'),worldWidthUniform=gl.getUniformLocation(program,'worldWidth'),signalTimeUniform=gl.getUniformLocation(program,'signalTime'),pixelWidthUniform=gl.getUniformLocation(program,'pixelWidth'),injectingUniform=gl.getUniformLocation(program,'injecting');
+  gl.useProgram(program);gl.uniform1i(gl.getUniformLocation(program,'nativeField'),0);const positionUniform=gl.getUniformLocation(program,'position'),worldWidthUniform=gl.getUniformLocation(program,'worldWidth');
   gl.uniform1i(gl.getUniformLocation(program,'spineSignal'),1);
   const buffer=gl.createBuffer()!;gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
@@ -58,8 +56,8 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,tier.source,tier.source,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
   const signalTexture=gl.createTexture()!;gl.bindTexture(gl.TEXTURE_2D,signalTexture);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,1024,1,0,gl.RED,gl.UNSIGNED_BYTE,new Uint8Array(1024).fill(128));
-  let referenceTime=0,referencePosition=0;
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,512,1,0,gl.RED,gl.UNSIGNED_BYTE,new Uint8Array(512).fill(128));
+  let feedPosition=0;const displayedSamples=new Uint8Array(512);
   const perf=new URLSearchParams(location.search).get('perf')==='1'?createPerformanceMonitor(gl,value=>{diagnostics.performance=value;}):null;
   const sampleCount = 1024;
   const audioLevels = {timeByteArray:new Uint8Array(sampleCount),timeByteArrayL:new Uint8Array(sampleCount),timeByteArrayR:new Uint8Array(sampleCount)};
@@ -89,8 +87,8 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     for(let i=0;i<sampleCount;i++) {
       const y = i/sampleCount*6;
       const phase = y*Math.PI/3;
-      let a = Math.sin(phase*9-now*.7)*.13 + Math.sin(phase*23+now*.41)*.055;
-      let b = Math.sin(phase*9-now*.7+.18)*.12 + Math.sin(phase*17-now*.37)*.045;
+      let a = Math.sin(phase*2-now*.45)*.10 + Math.sin(phase*9-now*.7)*.13 + Math.sin(phase*23+now*.41)*.055 + Math.sin(phase*83-now*.55)*.025;
+      let b = Math.sin(phase*2-now*.45+.1)*.095 + Math.sin(phase*9-now*.7+.18)*.12 + Math.sin(phase*17-now*.37)*.045 + Math.sin(phase*79-now*.55)*.025;
       let envelope = 0;
       for(const pulse of pulses) {
         const age = now-pulse.born;
@@ -99,8 +97,8 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
         const strength = Math.exp(-distance*distance/(pulse.width*pulse.width))*Math.exp(-age*.5)*(1-Math.exp(-age/.22))*pulse.amplitude;
         envelope += strength;
         const carrier = phase*pulse.harmonic - now*(1.3+pulse.speed*.5)+pulse.phase;
-        a += strength*(Math.sin(carrier)*.58+Math.sin(carrier*2-pulse.phase)*.21);
-        b += strength*(Math.sin(carrier+.26)*.54+Math.sin(phase*(pulse.harmonic+3)+now*.8)*.18);
+        a += strength*(Math.sin(phase*2-now*.6)*.13+Math.sin(carrier)*.58+Math.sin(carrier*2-pulse.phase)*.21+Math.sin(phase*(80+pulse.harmonic)+pulse.phase-now*.7)*.08);
+        b += strength*(Math.sin(phase*3-now*.6)*.12+Math.sin(carrier+.26)*.54+Math.sin(phase*(pulse.harmonic+3)+now*.8)*.18+Math.sin(phase*(76+pulse.harmonic)+pulse.phase-now*.7)*.07);
       }
       // Soft limiting and explicit byte saturation avoid Uint8Array's modulo overflow.
       left[i]=smoothLeft[i]=ease(smoothLeft[i],Math.tanh(a*(1+gestureEnergy*.28)),signalAttack,signalRelease);
@@ -128,7 +126,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     smoothLeft.fill(0);smoothRight.fill(0);smoothEnvelope.fill(0);
     diagnostics.pulseCount=0;uploadSignal();
   }
-  const spine:NativeSpineInput={samples:audioLevels.timeByteArray,envelope:new Float32Array(sampleCount),time:0,position:0,worldWidth:Math.max(3.9,innerWidth/innerHeight*3.25),theme:selectedTheme,injecting:true,
+  const spine:NativeSpineInput={samples:visualizer.renderer.audio.timeArrayL,envelope:new Float32Array(sampleCount),time:0,position:0,worldWidth:Math.max(3.9,innerWidth/innerHeight*3.25),theme:selectedTheme,injecting:true,
     onDeposit:()=>{
       diagnostics.nativeTargetBound=nativeGl.getParameter(nativeGl.DRAW_FRAMEBUFFER_BINDING)===visualizer.renderer.targetFrameBuffer;
       if(!diagnostics.nativeTargetBound) throw new Error('Native waveform stage is not bound to target feedback');
@@ -143,12 +141,12 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     nativeGl.bindFramebuffer(nativeGl.FRAMEBUFFER,previous);
   }
   const disposeSpine=installNativeSpine(nativeGl,visualizer.renderer,spine);
-  let goodPreset:unknown=themes[themeIndex].preset,goodIdentity=selectedTheme==='horizon';
+  let goodPreset:unknown=themes[themeIndex].preset;
   let renderFailed=false,goodName=themes[themeIndex].name as string;
   let pendingPreset:{preset:unknown;name:string;resolve:()=>void;reject:(error:unknown)=>void}|null=null;
-  function loadPreset(preset:unknown,identity=false) {
+  function loadPreset(preset:unknown) {
     const native=visualizer.renderer,stale=[native.prevWarpShader.shaderProgram,native.prevCompShader.shaderProgram];
-    try{visualizer.loadPreset(createNativeSpinePreset(preset,identity),0);}
+    try{visualizer.loadPreset(createNativeSpinePreset(preset),0);}
     finally{
       const retained=[native.warpShader.shaderProgram,native.compShader.shaderProgram,native.prevWarpShader.shaderProgram,native.prevCompShader.shaderProgram];
       for(const program of stale)if(!retained.includes(program)){for(const shader of nativeGl.getAttachedShaders(program)||[])nativeGl.deleteShader(shader);nativeGl.deleteProgram(program);}
@@ -158,7 +156,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     }
     clearNativeFeedback();
   }
-  function loadTheme() {pendingPreset?.reject(new Error('Preset selection superseded'));pendingPreset=null;spine.theme=themes[themeIndex].id;loadPreset(themes[themeIndex].preset,themes[themeIndex].id==='horizon');goodPreset=themes[themeIndex].preset;goodIdentity=themes[themeIndex].id==='horizon';goodName=themes[themeIndex].name;renderFailed=false;delete diagnostics.error;}
+  function loadTheme() {pendingPreset?.reject(new Error('Preset selection superseded'));pendingPreset=null;spine.theme=themes[themeIndex].id;loadPreset(themes[themeIndex].preset);goodPreset=themes[themeIndex].preset;goodName=themes[themeIndex].name;renderFailed=false;delete diagnostics.error;}
   loadTheme();
   let previous=performance.now(),time=0,lastSignal=-1,lastRender=-1,request=0,disposed=false,target=0,current=0;
   let paused=matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -190,16 +188,18 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
         if(!renderFailed&&(lastRender<0||(!paused&&time-lastRender>=1/tier.cadence-.0007))) {
           const elapsed=lastRender<0?1/tier.cadence:Math.min(.1,time-lastRender);
           spine.position=current;visualizer.render({audioLevels,elapsedTime:elapsed});lastRender=time;
-          if(pendingPreset){goodPreset=pendingPreset.preset;goodName=pendingPreset.name;goodIdentity=false;pendingPreset.resolve();pendingPreset=null;}
+          if(pendingPreset){goodPreset=pendingPreset.preset;goodName=pendingPreset.name;pendingPreset.resolve();pendingPreset=null;}
+          diagnostics.nativeBands={bass:visualizer.renderer.audioLevels.bass,mid:visualizer.renderer.audioLevels.mid,treble:visualizer.renderer.audioLevels.treb};
           diagnostics.nativeFrames=visualizer.renderer.frameNum;diagnostics.nativePosition=wrap(spine.position);diagnostics.milkFrames++;diagnostics.waveformFeedTime=spine.time;
           gl.bindTexture(gl.TEXTURE_2D,texture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,source);
-          gl.bindTexture(gl.TEXTURE_2D,signalTexture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,1024,1,gl.RED,gl.UNSIGNED_BYTE,spine.samples);referenceTime=spine.time;referencePosition=spine.position;
+          for(let i=0;i<512;i++)displayedSamples[i]=spine.samples[i]+128;
+          gl.bindTexture(gl.TEXTURE_2D,signalTexture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,512,1,gl.RED,gl.UNSIGNED_BYTE,displayedSamples);feedPosition=spine.position;
         }
         perf?.beginGpu();gl.useProgram(program);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);
-        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1f(positionUniform,referencePosition);gl.uniform1f(worldWidthUniform,spine.worldWidth);gl.uniform1f(signalTimeUniform,referenceTime);gl.uniform1f(pixelWidthUniform,spine.worldWidth/canvas.width);gl.uniform1f(injectingUniform,spine.injecting?1:0);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,signalTexture);gl.drawArrays(gl.TRIANGLES,0,6);diagnostics.frames++;
+        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1f(positionUniform,feedPosition);gl.uniform1f(worldWidthUniform,spine.worldWidth);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,signalTexture);gl.drawArrays(gl.TRIANGLES,0,6);diagnostics.frames++;
         perf?.endGpu();perf?.endFrame(performance.now()-submittedAt,[canvas.width,canvas.height],diagnostics.nativeSize);
       } catch(error){perf?.endGpu();renderFailed=true;fail(error);
-        if(pendingPreset){pendingPreset.reject(error);pendingPreset=null;try{loadPreset(goodPreset,goodIdentity);diagnostics.presets=[goodName];lastRender=-1;renderFailed=false;}catch{/* Picker can still load a new candidate. */}}
+        if(pendingPreset){pendingPreset.reject(error);pendingPreset=null;try{loadPreset(goodPreset);diagnostics.presets=[goodName];lastRender=-1;renderFailed=false;}catch{/* Picker can still load a new candidate. */}}
       }
     } else perf?.idle();request=requestAnimationFrame(frame);
   }
@@ -218,7 +218,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     setPreset(preset:unknown,name:string):Promise<void>{
       pendingPreset?.reject(new Error('Preset selection superseded'));pendingPreset=null;
       try{loadPreset(preset);renderFailed=false;delete diagnostics.error;diagnostics.presets=[name];lastRender=-1;quality.suspend();}
-      catch(error){try{loadPreset(goodPreset,goodIdentity);diagnostics.presets=[goodName];renderFailed=false;lastRender=-1;}catch{renderFailed=true;}return Promise.reject(error);}
+      catch(error){try{loadPreset(goodPreset);diagnostics.presets=[goodName];renderFailed=false;lastRender=-1;}catch{renderFailed=true;}return Promise.reject(error);}
       return new Promise((resolve,reject)=>{pendingPreset={preset,name,resolve,reject};});
     },
     reset(){target=0;clearExcitation();clearNativeFeedback();lastSignal=-1;lastRender=-1;},

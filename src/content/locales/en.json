@@ -133,7 +133,8 @@
       "targetBound": "Wave stage bound to native feedback target",
       "targetUnknown": "Native target not yet observed",
       "stopInjection": "Stop waveform injection",
-      "resumeInjection": "Resume waveform injection"
+      "resumeInjection": "Resume waveform injection",
+      "bands": "Native FFT · bass {{bass}} · mid {{mid}} · treble {{treble}}"
     },
     "themes": {
       "label": "Visual theme",

@@ -122,6 +122,7 @@ function TreeMuseum() {
       <span>{t('museum.perf.context',{power:perf.requestedPower})} · {t(perf.paused?'museum.perf.paused':'museum.perf.running')}</span>
       <span>{t('museum.perf.quality',{tier:window.__treeMuseum?.quality.tier||'high',reason:t(`museum.perf.qualityReasons.${window.__treeMuseum?.quality.reason||'warmup'}`),changes:String(window.__treeMuseum?.quality.transitions||0)})}</span>
       <span>{t('museum.perf.native',{frames:String(window.__treeMuseum?.nativeFrames||0),deposits:String(window.__treeMuseum?.nativeDeposits||0),points:String(window.__treeMuseum?.nativeWavePoints||0)})}</span>
+      <span>{t('museum.perf.bands',{bass:(window.__treeMuseum?.nativeBands?.bass||0).toFixed(2),mid:(window.__treeMuseum?.nativeBands?.mid||0).toFixed(2),treble:(window.__treeMuseum?.nativeBands?.treble||0).toFixed(2)})}</span>
       <span>{t(window.__treeMuseum?.nativeTargetBound?'museum.perf.targetBound':'museum.perf.targetUnknown')}</span>
       <span>{perf.renderer}</span>
       <button type="button" aria-pressed={injecting} onClick={()=>{renderer.current?.setInjecting(!injecting);setInjecting(!injecting);}}>{t(injecting?'museum.perf.stopInjection':'museum.perf.resumeInjection')}</button>

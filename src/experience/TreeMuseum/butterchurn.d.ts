@@ -5,6 +5,8 @@ declare module 'butterchurn' {
     timeByteArrayR: Uint8Array;
   }
   interface NativeRenderer {
+    audio:{timeArrayL:Int8Array;freqArray:Float32Array};
+    audioLevels:{bass:number;mid:number;treb:number;bass_att:number;mid_att:number;treb_att:number};
     prevWarpShader:{shaderProgram:WebGLProgram};prevCompShader:{shaderProgram:WebGLProgram};
     warpShader:{shaderProgram:WebGLProgram};compShader:{shaderProgram:WebGLProgram};
     customShapes:{setupShapeBuffers:(...args:unknown[])=>void;drawCustomShapeInstance:(...args:unknown[])=>void}[];
@@ -17,7 +19,7 @@ declare module 'butterchurn' {
     blurShader3:{blurHorizontalFrameBuffer:WebGLFramebuffer;blurVerticalFrameBuffer:WebGLFramebuffer};
   }
   interface Visualizer {
-    /** Version-pinned2.6.7 internals used only for feedback reset and deposit-stage diagnostics. */
+    /** Version-pinned2.6.7 internals for native source drawing, input analysis, feedback reset and diagnostics. */
     renderer:NativeRenderer;
     loadPreset(preset: unknown, blendTime: number): void;
     render(options: { audioLevels: AudioLevels; elapsedTime: number }): void;
