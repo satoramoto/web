@@ -16,6 +16,8 @@ export interface MuseumDiagnostics {
   pulseCount: number;
   signalEnergy: number;
   layerRms: number[];
+  waveformFeed: string;
+  waveformFeedTime: number[];
   trailFrames: number;
   feedbackFrames: number;
   feedbackSize: number[];
@@ -45,6 +47,9 @@ uniform int theme;
 const float PI = 3.14159265;
 float loopDistance(float a,float b) { return mod(a-b+3.,6.)-3.; }
 float trunk(float y) { return .32*sin(y*PI/3.+.4)+.15*sin(y*PI+clock*.07); }
+vec4 signalAt(float y,float row) { return texture(signalField,vec2(y/6.+.5/1024.,(row+.5)/16.)); }
+float signedSample(vec4 signal) { return (signal.r*255.-128.)/127.; }
+float spineAt(float y,vec4 signal) { return trunk(y)+signedSample(signal)*.3; }
 vec3 sampleLayer(int layer,vec2 coord) {
   vec2 reflected=1.-abs(mod(coord,2.)-1.);
   if(layer==0) return texture(milk0,reflected).rgb;
@@ -91,22 +96,24 @@ uniform float freshField;
 void main() {
   float y=uv.y*6.;
   float x=(uv.x-.5)*worldWidth();
-  float stem=trunk(y);
-  float localY=loopDistance(y,3.);
-  vec2 p=vec2((x-stem)*6./(worldWidth()*aspect),localY);
+  vec4 signal=signalAt(y,0.);
+  float stem=spineAt(y,signal), signedWave=signedSample(signal);
+  float dx=x-stem;
+  // Every y has its own emitter on the exact visible waveform; there is no fixed radial world center.
+  vec2 p=vec2(dx*6./(worldWidth()*aspect),signedWave*.9+.12*sin(y*PI));
   float radius=length(p), angle=atan(p.y,p.x);
   vec2 coordinate;
   if(theme==0) {
     // Fold polar space into twelve moving mirror sectors: bright source geometry stays intact.
     float folded=abs(mod(angle+clock*.11,PI/3.)-PI/6.);
     coordinate=.5+vec2(cos(folded*6.),sin(folded*6.))*radius*.32;
-    coordinate+=vec2(.08*sin(clock*.17),.08*cos(clock*.13));
+    coordinate+=vec2(.08*sin(clock*.17),y/3.+signedWave*.32);
   } else if(theme==1) {
-    coordinate=vec2(.5+(x-stem)*.31,.5+.43*sin(y*PI/3.));
+    coordinate=vec2(.5+dx*.31+signedWave*.2,.5+.43*sin(y*PI/3.)+signedWave*.36);
     coordinate+=vec2(sin(y*PI+clock*.23),cos(x*2.3-clock*.19))*.14;
   } else {
     // A logarithmic tunnel, with the vanishing points repeating in the six-unit world.
-    coordinate=vec2(angle/PI*2.+clock*.16,-log(radius+.10)*.65-clock*.23);
+    coordinate=vec2(angle/PI*2.+clock*.16,-log(abs(dx)+.10)*.65-clock*.23+signedWave*.36);
     coordinate+=vec2(.06*sin(y*PI),.08*cos(y*2.*PI/3.));
   }
   vec3 probe0=sampleLayer(0,coordinate);
@@ -132,20 +139,24 @@ void main() {
   vec3 mixed=hero*.78+(a*weights.x+b*weights.y+c*weights.z)*.22;
   float gray=dot(mixed,vec3(.2126,.7152,.0722));
   vec3 detail=clamp((mixed-vec3(gray))*1.35+gray,0.,1.)*1.4;
-  vec2 limbs=texture(branchMask,vec2(uv.x,y/6.)).rg;
-  float reach=abs(x-stem);
-  float anchor=limbs.x+exp(-reach*reach*1.6);
-  float coverage=theme==1?(.14+anchor*.86):(.16+anchor*.84);
-  if(theme==0) coverage*=exp(-radius*radius*.085)*(1.-smoothstep(2.65,3.,abs(localY)));
-  if(theme==2) coverage*=1.-smoothstep(2.65,3.,abs(localY));
-  vec3 injected=detail*min(1.,coverage);
-  vec2 velocity=flow*(theme==1?.8:.3)+vec2(0.,theme==2?.12:.025);
-  if(theme==0) velocity+=vec2(-p.y,p.x)*.018;
+  float amplitude=abs(signedWave);
+  float width=.09+signal.b*.48+amplitude*.12;
+  float emission=exp(-dx*dx/(width*width))*(.065+signal.b*1.8+amplitude*.25)*signal.a;
+  vec3 injected=clamp(detail*min(1.6,emission),0.,1.);
+  // Backtrace away from the same signed sample position. Old emission travels out into quiet space.
+  float side=dx/sqrt(dx*dx+.003);
+  float outward=theme==2?2.2:theme==0?1.65:1.1;
+  float envelopeSlope=(signalAt(y+.035,0.).b-signalAt(y-.035,0.).b)/.07;
+  vec2 velocity=vec2(side*outward/worldWidth(),.035-clamp(envelopeSlope,-3.,3.)*.12+signedWave*(theme==1?.16:.09));
+  velocity+=flow*(theme==1?.45:.18);
+  if(theme==0) velocity.y+=side*.09*sin(y*PI);
   vec2 advected=vec2(clamp(uv.x-velocity.x*feedbackDelta,0.,1.),fract(uv.y-velocity.y*feedbackDelta));
   vec3 previous=texture(sharedField,advected).rgb;
-  float retention=freshField>0.5?0.:exp(-feedbackDelta*(theme==1?7.:22.));
-  // Convex, time-scaled mixing cannot amplify its own output into uncontrolled white feedback.
-  color=vec4(clamp(previous*retention+injected*(1.-retention),0.,1.),1.);
+  float retention=exp(-feedbackDelta*(theme==1?.85:1.15));
+  vec3 retained=freshField>0.5?vec3(0.):previous*retention;
+  float exposure=freshField>0.5?1.:1.-exp(-feedbackDelta*18.);
+  // Bounded screen injection exposes local preset detail quickly; decay independently controls its wake.
+  color=vec4(retained+injected*exposure*(1.-retained),1.);
 }
 `;
 const fragment = shaderCommon + `
@@ -164,17 +175,16 @@ void main() {
   for(int row=11;row>=1;row--) {
     float age=float(row)*.06;
     float trailingY=mod(y-age*.45+6.,6.);
-    vec4 past=texture(signalField,vec2(trailingY/6.,(float(row)+.5)/16.));
-    float waveform=(past.r*2.-1.)*.24+(past.g*2.-1.)*.06;
+    vec4 past=signalAt(trailingY,float(row));
+    float waveform=signedSample(past)*.3;
     float ghostDistance=abs(x-stem-waveform-age*.028);
     float fade=exp(-age*2.5)*past.a;
     vec3 ghostColor=mix(vec3(.19,.33,.82),vec3(.64,.42,1.),age/.66);
     result+=ghostColor*exp(-ghostDistance*ghostDistance*6500.)*(.028+past.b*.72)*fade;
     result+=ghostColor*exp(-ghostDistance*ghostDistance*210.)*past.b*.045*fade;
   }
-  vec4 signal=texture(signalField,vec2(y/6.,.5/16.));
-  float waveform=(signal.r*2.-1.)*.24+(signal.g*2.-1.)*.06;
-  float waveDistance=abs(x-stem-waveform);
+  vec4 signal=signalAt(y,0.);
+  float waveDistance=abs(x-spineAt(y,signal));
   vec3 spineColor=mix(vec3(.27,.5,1.),vec3(.95,.83,1.),.45+signal.b*.4);
   result+=spineColor*exp(-waveDistance*waveDistance*6500.)*(.18+signal.b*1.65)*signal.a;
   result+=vec3(.2,.38,.9)*exp(-waveDistance*waveDistance*210.)*(.055+signal.b*.48)*signal.a;
@@ -194,6 +204,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     presets: [...themes[themeIndex].names],
     frames: 0, milkFrames: 0, position: 0, paused: false,
     gestureCount: 0, pulseCount: 0, signalEnergy: 0, layerRms: [0,0,0],
+    waveformFeed: 'Exact quantized mono spine samples; all preset channels identical',waveformFeedTime:[0,0,0],
     trailFrames: 0, feedbackFrames: 0, feedbackSize: [],
   };
   window.__treeMuseum = diagnostics;
@@ -262,7 +273,6 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   interface Pulse { born: number; origin: number; amplitude: number; speed: number; width: number; phase: number; harmonic: number }
   const pulses: Pulse[] = [];
   const history: SignalFrame[] = [];
-  const filters = sources.map(()=>({left:new Float32Array(sampleCount),right:new Float32Array(sampleCount)}));
   let gestureEnergy = 0, lastPulse = -1, randomState = 0x62f37a;
   const random = () => {
     randomState ^= randomState<<13;randomState ^= randomState>>>17;randomState ^= randomState<<5;
@@ -314,8 +324,10 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       const amount=newer.time===older.time?0:(at-older.time)/(newer.time-older.time);
       for(let i=0;i<sampleCount;i++) {
         const offset=(row*sampleCount+i)*4;
-        signalPixels[offset]=byte(older.left[i]+(newer.left[i]-older.left[i])*amount);
-        signalPixels[offset+1]=byte(older.right[i]+(newer.right[i]-older.right[i])*amount);
+        const left=older.left[i]+(newer.left[i]-older.left[i])*amount;
+        const right=older.right[i]+(newer.right[i]-older.right[i])*amount;
+        // One canonical mono waveform: the uploaded bytes are also the actual Butterchurn input.
+        signalPixels[offset]=signalPixels[offset+1]=byte(left*.8+right*.2);
         signalPixels[offset+2]=Math.round((older.envelope[i]+(newer.envelope[i]-older.envelope[i])*amount)*255);
         signalPixels[offset+3]=255;
       }
@@ -324,24 +336,18 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,sampleCount,traceRows,gl.RGBA,gl.UNSIGNED_BYTE,signalPixels);
     diagnostics.trailFrames=history.length;
   }
-  function driveLayer(index: number, now: number) {
-    // Delays read an immutable shared snapshot; filters belong to each destination only.
-    let snapshot = history[0];
-    for(let h=history.length-1;h>=0;h--) if(history[h].time<=now-index*.16) {snapshot=history[h];break;}
-    const filter = filters[index], smoothing = [.68,.43,.28][index];
-    let energy = 0;
+  function driveLayer(index: number) {
+    let energy=0;
     for(let i=0;i<sampleCount;i++) {
-      filter.left[i] += (snapshot.left[i]-filter.left[i])*smoothing;
-      filter.right[i] += (snapshot.right[i]-filter.right[i])*smoothing;
-      audioLevels.timeByteArrayL[i]=byte(filter.left[i]);audioLevels.timeByteArrayR[i]=byte(filter.right[i]);
-      audioLevels.timeByteArray[i]=byte((filter.left[i]+filter.right[i])*.5);
-      energy += filter.left[i]*filter.left[i]+filter.right[i]*filter.right[i];
+      const value=signalPixels[i*4];
+      audioLevels.timeByteArray[i]=audioLevels.timeByteArrayL[i]=audioLevels.timeByteArrayR[i]=value;
+      energy+=Math.pow((value-128)/127,2);
     }
-    diagnostics.layerRms[index] = Math.sqrt(energy/(sampleCount*2));
+    diagnostics.layerRms[index]=Math.sqrt(energy/sampleCount);
+    diagnostics.waveformFeedTime[index]=history[history.length-1].time;
   }
   function clearExcitation() {
     pulses.length=0;history.length=0;gestureEnergy=0;lastPulse=-1;
-    filters.forEach(filter=>{filter.left.fill(0);filter.right.fill(0);});
     diagnostics.pulseCount=0;uploadTraces();
   }
   let fieldWidth=tier.field[0], fieldHeight=tier.field[1];
@@ -439,7 +445,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
           }
           if(index<0) break;
           const destination=sources[index], elapsed=destination.lastRender<0?1/tier.cadence:Math.min(.1,time-destination.lastRender);
-          driveLayer(index,time);destination.visualizer.render({audioLevels,elapsedTime:elapsed});
+          driveLayer(index);destination.visualizer.render({audioLevels,elapsedTime:elapsed});
           gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,destination.texture);
           gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,destination.source);
           destination.lastRender=time;diagnostics.milkFrames++;destinationsChanged=true;
