@@ -1,7 +1,7 @@
 export const qualityTiers = {
-  high: {source:512,cadence:30,field:[640,960],mask:[512,768],scale:1,display:1440},
-  balanced: {source:320,cadence:24,field:[384,640],mask:[384,640],scale:.85,display:1152},
-  low: {source:192,cadence:18,field:[256,384],mask:[256,512],scale:.65,display:900},
+  high: {source:1024,cadence:60,scale:1,display:1440},
+  balanced: {source:512,cadence:30,scale:.85,display:1152},
+  low: {source:256,cadence:20,scale:.65,display:900},
 } as const;
 export type QualityTier = keyof typeof qualityTiers;
 export interface QualityStatus {tier:QualityTier;mode:'auto'|QualityTier;reason:'warmup'|'override'|'holding'|'slow'|'headroom';transitions:number;fps:number;rafP95Ms:number}

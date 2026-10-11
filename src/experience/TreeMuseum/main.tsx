@@ -17,6 +17,7 @@ function TreeMuseum() {
   const [theme,setTheme]=useState<ThemeId>(initialTheme);
   const themeButtons=useRef<(HTMLButtonElement|null)[]>([]);
   const [perf,setPerf]=useState<MuseumPerformance|null>(null);
+  const [injecting,setInjecting]=useState(true);
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useRef<ReturnType<typeof createMuseumRenderer> | null>(null);
   const labels = useRef<(HTMLButtonElement | null)[]>([]);
@@ -87,14 +88,17 @@ function TreeMuseum() {
   const close=()=>{const previous=active;setActive(null);if(previous!==null) requestAnimationFrame(()=>labels.current[previous]?.focus());};
   return <main className="tree-museum" aria-label={t('museum.label')}>
     <canvas ref={canvas} className="museum-canvas" aria-hidden="true" />
-    {perfEnabled && perf && <output id="museum-performance" className="museum-performance" aria-label={t('museum.perf.label')} data-quality={window.__treeMuseum?.quality.tier} data-quality-transitions={window.__treeMuseum?.quality.transitions} data-fps={perf.fps.toFixed(1)} data-raf-p95-ms={perf.rafP95Ms.toFixed(2)} data-cpu-p95-ms={perf.cpuP95Ms.toFixed(2)} data-compositor-gpu-ms={perf.compositorGpuMs?.toFixed(2)||'unavailable'}>
+    {perfEnabled && perf && <output id="museum-performance" className="museum-performance" aria-label={t('museum.perf.label')} data-native-frames={window.__treeMuseum?.nativeFrames} data-native-deposits={window.__treeMuseum?.nativeDeposits} data-native-target-bound={String(window.__treeMuseum?.nativeTargetBound)} data-injecting={String(injecting)} data-quality={window.__treeMuseum?.quality.tier} data-quality-transitions={window.__treeMuseum?.quality.transitions} data-fps={perf.fps.toFixed(1)} data-raf-p95-ms={perf.rafP95Ms.toFixed(2)} data-cpu-p95-ms={perf.cpuP95Ms.toFixed(2)} data-compositor-gpu-ms={perf.compositorGpuMs?.toFixed(2)||'unavailable'}>
       <span>{t('museum.perf.timing',{fps:perf.fps.toFixed(1),raf:perf.rafP95Ms.toFixed(2)})}</span>
       <span>{t('museum.perf.cpu',{mean:perf.cpuMeanMs.toFixed(2),p95:perf.cpuP95Ms.toFixed(2)})}</span>
       <span>{perf.compositorGpuMs===null?t('museum.perf.gpuUnavailable'):t('museum.perf.gpu',{ms:perf.compositorGpuMs.toFixed(2)})}</span>
       <span>{t('museum.perf.size',{canvas:perf.canvas.join(' × '),field:perf.field.join(' × ')})}</span>
       <span>{t('museum.perf.context',{power:perf.requestedPower})} · {t(perf.paused?'museum.perf.paused':'museum.perf.running')}</span>
       <span>{t('museum.perf.quality',{tier:window.__treeMuseum?.quality.tier||'high',reason:t(`museum.perf.qualityReasons.${window.__treeMuseum?.quality.reason||'warmup'}`),changes:String(window.__treeMuseum?.quality.transitions||0)})}</span>
+      <span>{t('museum.perf.native',{frames:String(window.__treeMuseum?.nativeFrames||0),deposits:String(window.__treeMuseum?.nativeDeposits||0),points:String(window.__treeMuseum?.nativeWavePoints||0)})}</span>
+      <span>{t(window.__treeMuseum?.nativeTargetBound?'museum.perf.targetBound':'museum.perf.targetUnknown')}</span>
       <span>{perf.renderer}</span>
+      <button type="button" aria-pressed={injecting} onClick={()=>{renderer.current?.setInjecting(!injecting);setInjecting(!injecting);}}>{t(injecting?'museum.perf.stopInjection':'museum.perf.resumeInjection')}</button>
     </output>}
     <div className="museum-grain" aria-hidden="true" />
     <header className="museum-heading"><span>{t('museum.heading')}</span><span className="museum-heading-line" /></header>
