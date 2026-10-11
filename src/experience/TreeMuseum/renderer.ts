@@ -48,7 +48,7 @@ void main() {
     float radius = length(vec2(dx,dy*.85));
     float angle = atan(dy,dx);
     vec2 sampleUV = vec2(.5) + vec2(cos(angle+radius*.9+clock*.035),sin(angle+radius*.9+clock*.035))*radius*.19;
-    sampleUV += vec2(.035*sin(y*2.+clock*.08), clock*.005);
+    sampleUV += vec2(.035*sin(y*(2.*PI/3.)+clock*.08), clock*.005);
     vec3 milk;
     if(j==0) milk=texture(milk0,fract(sampleUV)).rgb;
     else if(j==1) milk=texture(milk1,fract(sampleUV)).rgb;
@@ -81,7 +81,7 @@ void main() {
     result += tint*spiralLine*exp(-radius*3.2)*(.15+lum*.7);
     result += mix(tint,vec3(.8,.88,1.),.65)*exp(-radius*radius*190.)*.58;
   }
-  float filaments = pow(max(0.,sin((x-stem)*84.+sin(y*8.+clock*.4)*1.5)),14.);
+  float filaments = pow(max(0.,sin((x-stem)*84.+sin(y*(8.*PI/3.)+clock*.4)*1.5)),14.);
   result += vec3(.16,.32,.75)*filaments*exp(-stemDist*stemDist*18.)*.12;
   float vignette = (1.-smoothstep(.24,.78,abs(uv.x-.5)));
   result *= vignette;
