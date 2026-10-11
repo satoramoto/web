@@ -99,7 +99,7 @@ function TreeMuseum() {
       if(activeRef.current!==null||pickerRef.current) return;
       const target=event.target;
       if(target instanceof HTMLElement&&target.closest('input,textarea,select,[contenteditable]'))return;
-      if(event.key==='['||event.key===']'||event.key.toLowerCase()==='r') {
+      if(!event.ctrlKey&&!event.metaKey&&!event.altKey&&(event.key==='['||event.key===']'||event.key.toLowerCase()==='r')) {
         event.preventDefault();const index=presetCatalogue.findIndex(preset=>preset.id===requestedPreset.current);
         const next=event.key.toLowerCase()==='r'?Math.floor(Math.random()*presetCatalogue.length):(Math.max(0,index)+(event.key==='['?-1:1)+presetCatalogue.length)%presetCatalogue.length;
         void selectLibrary(presetCatalogue[next].id);return;

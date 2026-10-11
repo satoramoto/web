@@ -177,8 +177,8 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
       try {
         if(qualityChanged) applyQuality();
         if(lastSignal<0||(!paused&&time-lastSignal>=1/60-.0004)){history.push(synthesize(time));uploadSignal();lastSignal=time;}
-        if(!renderFailed&&(lastRender<0||Math.abs(current-spine.position)>.0001||(!paused&&time-lastRender>=1/tier.cadence-.0007))) {
-          const elapsed=lastRender<0?1/tier.cadence:Math.min(.1,time-lastRender);
+        if(!renderFailed&&(lastRender<0||(!paused&&(Math.abs(current-spine.position)>.0001||time-lastRender>=1/tier.cadence-.0007)))) {
+          const elapsed=lastRender<0?1/tier.cadence:Math.max(1/240,Math.min(.1,time-lastRender));
           spine.position=current;visualizer.render({audioLevels,elapsedTime:elapsed});lastRender=time;
           if(pendingPreset){goodPreset=pendingPreset.preset;goodName=pendingPreset.name;pendingPreset.resolve();pendingPreset=null;}
           diagnostics.nativeBands={bass:visualizer.renderer.audioLevels.bass,mid:visualizer.renderer.audioLevels.mid,treble:visualizer.renderer.audioLevels.treb};
@@ -205,7 +205,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     get position(){return depositedPosition;},
     get journeyLength(){return journeyLength;},
     getSpinePoint(worldY:number){return {x:nativeSpineX(depositedSamples,worldY,depositedWidth),y:wrapJourney(worldY-depositedPosition)/viewportLength};},
-    jump(worldY:number){target=wrapJourney(worldY);lastRender=-1;},
+    jump(worldY:number){target=wrapJourney(worldY);},
     setPaused(value:boolean){paused=value;diagnostics.paused=value;},
     setInjecting(value:boolean){spine.injecting=value;diagnostics.injecting=value;},
     setTheme(value:ThemeId){if(diagnostics.theme===value&&diagnostics.presets[0]===themes.find(theme=>theme.id===value)?.name)return;themeIndex=themes.findIndex(theme=>theme.id===value);diagnostics.theme=value;diagnostics.presets=[themes[themeIndex].name];loadTheme();lastRender=-1;quality.suspend();},
