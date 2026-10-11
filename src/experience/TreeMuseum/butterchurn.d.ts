@@ -11,7 +11,7 @@ declare module 'butterchurn' {
   }
   const butterchurn: {
     createVisualizer(context: AudioContext | null, canvas: HTMLCanvasElement, options: {
-      width: number; height: number; pixelRatio: number; textureRatio: number;
+      width: number; height: number; pixelRatio: number; textureRatio: number; meshWidth?: number; meshHeight?: number;
     }): Visualizer;
   };
   export default butterchurn;

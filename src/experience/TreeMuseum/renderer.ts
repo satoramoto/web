@@ -1,4 +1,5 @@
 import butterchurn from 'butterchurn';
+import { createPerformanceMonitor, type MuseumPerformance } from './performance';
 import astral from './presets/astral.json';
 import spiral from './presets/spiral.json';
 import cascade from './presets/cascade.json';
@@ -17,6 +18,7 @@ export interface MuseumDiagnostics {
   trailFrames: number;
   feedbackFrames: number;
   feedbackSize: number[];
+  performance?: MuseumPerformance;
   error?: string;
 }
 declare global { interface Window { __treeMuseum?: MuseumDiagnostics } }
@@ -34,6 +36,7 @@ uniform sampler2D milk1;
 uniform sampler2D milk2;
 uniform sampler2D signalField;
 uniform sampler2D sharedField;
+uniform sampler2D branchMask;
 uniform float clock;
 uniform float position;
 uniform float aspect;
@@ -74,6 +77,12 @@ vec3 paletteAt(float y) {
   return tint(0)*w.x+tint(1)*w.y+tint(2)*w.z;
 }
 `;
+const maskFragment = shaderCommon + `
+void main() {
+  vec2 limbs=branching(vec2((uv.x-.5)*worldWidth(),uv.y*6.));
+  color=vec4(limbs,0.,1.);
+}
+`;
 const feedbackFragment = shaderCommon + `
 uniform float feedbackDelta;
 uniform float freshField;
@@ -99,7 +108,7 @@ void main() {
   // Strong source contrast preserves moving MilkDrop detail; color is anchored to the shared tree palette.
   float detail=pow(clamp(luminance*1.45,0.,1.),.78);
   vec3 palette=paletteAt(y);
-  vec2 limbs=branching(vec2(x,y));
+  vec2 limbs=texture(branchMask,vec2(uv.x,y/6.)).rg;
   float reach=abs(x-stem);
   float silhouette=min(1.,limbs.x+exp(-reach*reach*10.)*.75);
   vec3 injected=palette*detail*silhouette*.96;
@@ -118,9 +127,11 @@ void main() {
   float stem=trunk(y);
   vec3 result=texture(sharedField,vec2(uv.x,y/6.)).rgb+vec3(.001,.002,.006);
   // A sparse contour gives the tree structure without the old repeated fan of eighteen rails per layer.
-  vec2 limbs=branching(vec2(x,y));
+  vec2 limbs=texture(branchMask,vec2(uv.x,y/6.)).rg;
   result+=paletteAt(y)*limbs.y*.105;
   result+=paletteAt(y)*exp(-pow(x-stem,2.)*100.)*.048;
+  // The bounded signal cannot reach this pixel outside the narrow spine band.
+  if(abs(x-stem)<.58) {
   // Historical rows are actual immutable audio-source windows, not re-evaluated oscillators.
   for(int row=11;row>=1;row--) {
     float age=float(row)*.06;
@@ -139,6 +150,7 @@ void main() {
   vec3 spineColor=mix(vec3(.27,.5,1.),vec3(.95,.83,1.),.45+signal.b*.4);
   result+=spineColor*exp(-waveDistance*waveDistance*6500.)*(.34+signal.b*2.2)*signal.a;
   result+=vec3(.2,.38,.9)*exp(-waveDistance*waveDistance*210.)*(.055+signal.b*.48)*signal.a;
+  }
   result*=1.-smoothstep(.24,.78,abs(uv.x-.5));
   color=vec4(1.-exp(-result*1.3),1.);
 }
@@ -172,9 +184,15 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     for(let i=0;i<3;i++) gl.uniform1i(gl.getUniformLocation(program,`milk${i}`),i);
     gl.uniform1i(gl.getUniformLocation(program,'signalField'),3);
     gl.uniform1i(gl.getUniformLocation(program,'sharedField'),4);
+    gl.uniform1i(gl.getUniformLocation(program,'branchMask'),5);
     return program;
   }
-  const program=makeProgram(fragment), feedbackProgram=makeProgram(feedbackFragment);
+  const program=makeProgram(fragment), feedbackProgram=makeProgram(feedbackFragment), maskProgram=makeProgram(maskFragment);
+  const uniforms=new Map([program,feedbackProgram,maskProgram].map(pass=>[pass,{
+    clock:gl.getUniformLocation(pass,'clock'), aspect:gl.getUniformLocation(pass,'aspect'),position:gl.getUniformLocation(pass,'position'),
+    feedbackDelta:gl.getUniformLocation(pass,'feedbackDelta'),freshField:gl.getUniformLocation(pass,'freshField'),
+  }]));
+  const perf=new URLSearchParams(location.search).get('perf')==='1'?createPerformanceMonitor(gl,value=>{diagnostics.performance=value;}):null;
   const buffer = gl.createBuffer()!;
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
@@ -182,9 +200,10 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   gl.enableVertexAttribArray(attrib); gl.vertexAttribPointer(attrib,2,gl.FLOAT,false,0,0);
   const sources = [astral,spiral,cascade].map((preset, index) => {
     const source = document.createElement('canvas');
-    const size = matchMedia('(max-width: 700px)').matches ? 256 : 384;
+    const size = matchMedia('(max-width: 700px)').matches ? 256 : 320;
     source.width = source.height = size;
-    const visualizer = butterchurn.createVisualizer(null,source,{width:size,height:size,pixelRatio:1,textureRatio:1});
+    source.getContext('webgl2',{alpha:false,antialias:false,depth:false,stencil:false,premultipliedAlpha:false,powerPreference:'high-performance'});
+    const visualizer = butterchurn.createVisualizer(null,source,{width:size,height:size,pixelRatio:1,textureRatio:1,meshWidth:24,meshHeight:18});
     visualizer.loadPreset(structuredClone(preset),0);
     const texture = gl.createTexture()!;
     gl.activeTexture(gl.TEXTURE0+index); gl.bindTexture(gl.TEXTURE_2D,texture);
@@ -193,7 +212,8 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-    return {source,visualizer,texture};
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,size,size,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    return {source,visualizer,texture,lastRender:-1};
   });
   const sampleCount = 1024;
   const audioLevels = {timeByteArray:new Uint8Array(sampleCount),timeByteArrayL:new Uint8Array(sampleCount),timeByteArrayR:new Uint8Array(sampleCount)};
@@ -205,6 +225,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   const traceRows=16;
   const signalPixels=new Uint8Array(sampleCount*traceRows*4);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,sampleCount,traceRows,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
   interface SignalFrame { time: number; left: Float32Array; right: Float32Array; envelope: Float32Array }
   interface Pulse { born: number; origin: number; amplitude: number; speed: number; width: number; phase: number; harmonic: number }
   const pulses: Pulse[] = [];
@@ -218,7 +239,9 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   const wrap = (value: number) => ((value%6)+6)%6;
   const byte = (value: number) => Math.max(0,Math.min(255,Math.round(128+value*127)));
   function synthesize(now: number): SignalFrame {
-    const left = new Float32Array(sampleCount), right = new Float32Array(sampleCount), envelopes=new Float32Array(sampleCount);
+    // Reuse a snapshot only after it leaves the immutable retained history.
+    const recycled=history.length>=128?history.shift():undefined;
+    const left=recycled?.left||new Float32Array(sampleCount), right=recycled?.right||new Float32Array(sampleCount), envelopes=recycled?.envelope||new Float32Array(sampleCount);
     let energy = 0;
     for(let i=0;i<sampleCount;i++) {
       const y = i/sampleCount*6;
@@ -266,7 +289,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       }
     }
     gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,signalTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,sampleCount,traceRows,0,gl.RGBA,gl.UNSIGNED_BYTE,signalPixels);
+    gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,sampleCount,traceRows,gl.RGBA,gl.UNSIGNED_BYTE,signalPixels);
     diagnostics.trailFrames=history.length;
   }
   function driveLayer(index: number, now: number) {
@@ -289,8 +312,8 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     filters.forEach(filter=>{filter.left.fill(0);filter.right.fill(0);});
     diagnostics.pulseCount=0;uploadTraces();
   }
-  const fieldWidth=matchMedia('(max-width: 700px)').matches?256:512;
-  const fieldHeight=matchMedia('(max-width: 700px)').matches?512:768;
+  const fieldWidth=matchMedia('(max-width: 700px)').matches?256:384;
+  const fieldHeight=matchMedia('(max-width: 700px)').matches?512:640;
   diagnostics.feedbackSize=[fieldWidth,fieldHeight];
   const fields=[0,1].map(()=>{
     const texture=gl.createTexture()!, framebuffer=gl.createFramebuffer()!;
@@ -302,25 +325,33 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Shared flow framebuffer unavailable');
     return {texture,framebuffer};
   });
-  let readField=0, fieldReady=false;
-  let previous = performance.now(), time = 0, lastMilk = -1, request = 0, disposed = false;
+  const maskTexture=gl.createTexture()!, maskFramebuffer=gl.createFramebuffer()!;
+  const maskWidth=512, maskHeight=768;
+  gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,maskTexture);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,maskWidth,maskHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,maskFramebuffer);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,maskTexture,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Branch mask framebuffer unavailable');
+  let readField=0, fieldReady=false, lastMask=-1;
+  let previous = performance.now(), time = 0, lastSignal = -1, request = 0, disposed = false;
   let target = 0, current = 0, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function clearFields() {
     gl.clearColor(0,0,0,1);
     for(const field of fields) {gl.bindFramebuffer(gl.FRAMEBUFFER,field.framebuffer);gl.clear(gl.COLOR_BUFFER_BIT);}
-    gl.bindFramebuffer(gl.FRAMEBUFFER,null);fieldReady=false;readField=0;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);fieldReady=false;readField=0;lastMask=-1;
   }
   function bindPass(pass: WebGLProgram) {
     gl.useProgram(pass);
     sources.forEach(({texture},index)=>{gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,texture);});
     gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,signalTexture);
     gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,fields[readField].texture);
-    gl.uniform1f(gl.getUniformLocation(pass,'clock'),time);
-    gl.uniform1f(gl.getUniformLocation(pass,'aspect'),innerWidth/innerHeight);
-    gl.uniform1f(gl.getUniformLocation(pass,'position'),current);
+    gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,pass===maskProgram?null:maskTexture);
+    const cached=uniforms.get(pass)!;
+    gl.uniform1f(cached.clock,time);gl.uniform1f(cached.aspect,innerWidth/innerHeight);gl.uniform1f(cached.position,current);
   }
   const resize = () => {
-    const scale=Math.min(devicePixelRatio,1.5,1920/innerWidth);
+    const scale=Math.min(devicePixelRatio,1,1440/innerWidth);
     canvas.width=Math.round(innerWidth*scale);canvas.height=Math.round(innerHeight*scale);
     // Aspect changes alter world x extent, so old accumulation is deliberately cleared.
     clearFields();
@@ -334,6 +365,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     if(disposed) return;
     const dt = Math.min((now-previous)/1000,.05); previous=now;
     if (!document.hidden) {
+      const submittedAt=performance.now();perf?.startFrame(now,paused);
       if (!paused) {
         time += dt;gestureEnergy *= Math.exp(-dt*2.4);
         for(let i=pulses.length-1;i>=0;i--) if(time-pulses[i].born>7) pulses.splice(i,1);
@@ -343,32 +375,44 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       if (Math.abs(target-current)<.00001 && Math.abs(target)>600) { current=((current%6)+6)%6; target=current; }
       diagnostics.position=((current%6)+6)%6; diagnostics.paused=paused;
       try {
-        if (lastMilk<0 || (!paused && time-lastMilk>1/30)) {
-          const elapsed = lastMilk<0 ? 1/30 : Math.min(.1,time-lastMilk);
-          history.push(synthesize(time));
-          while(history.length>64) history.shift();
-          uploadTraces();
-          sources.forEach(({source,visualizer,texture},index)=>{
-            driveLayer(index,time);
-            visualizer.render({audioLevels,elapsedTime:elapsed*.55});
-            gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,texture);
-            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);
-          });
-          diagnostics.milkFrames++; lastMilk=time;
+        if(lastSignal<0 || (!paused && time-lastSignal>=1/60-.0004)) {
+          history.push(synthesize(time));uploadTraces();lastSignal=time;
         }
-        if(!fieldReady || !paused) {
+        let destinationsChanged=false;
+        // At most two due destinations per display frame; stagger their 30 Hz work instead of three-source bursts.
+        for(let slot=0;slot<2;slot++) {
+          let index=-1;
+          for(let candidate=0;candidate<sources.length;candidate++) {
+            const source=sources[candidate];
+            if(source.lastRender>=0 && (paused || time-source.lastRender<1/30-.0007)) continue;
+            if(index<0 || source.lastRender<sources[index].lastRender) index=candidate;
+          }
+          if(index<0) break;
+          const destination=sources[index], elapsed=destination.lastRender<0?1/30:Math.min(.1,time-destination.lastRender);
+          driveLayer(index,time);destination.visualizer.render({audioLevels,elapsedTime:elapsed*.55});
+          gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,destination.texture);
+          gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,destination.source);
+          destination.lastRender=time;diagnostics.milkFrames++;destinationsChanged=true;
+        }
+        perf?.beginGpu();
+        if(lastMask<0 || (!paused && time-lastMask>=1/15)) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER,maskFramebuffer);gl.viewport(0,0,maskWidth,maskHeight);bindPass(maskProgram);
+          gl.drawArrays(gl.TRIANGLES,0,6);lastMask=time;
+        }
+        if(!fieldReady || !paused || destinationsChanged) {
           const writeField=1-readField;
           gl.bindFramebuffer(gl.FRAMEBUFFER,fields[writeField].framebuffer);
           gl.viewport(0,0,fieldWidth,fieldHeight);bindPass(feedbackProgram);
-          gl.uniform1f(gl.getUniformLocation(feedbackProgram,'feedbackDelta'),dt);
-          gl.uniform1f(gl.getUniformLocation(feedbackProgram,'freshField'),fieldReady?0:1);
+          gl.uniform1f(uniforms.get(feedbackProgram)!.feedbackDelta,paused?0:dt);
+          gl.uniform1f(uniforms.get(feedbackProgram)!.freshField,(!fieldReady || (paused && destinationsChanged))?1:0);
           gl.drawArrays(gl.TRIANGLES,0,6);readField=writeField;fieldReady=true;diagnostics.feedbackFrames++;
         }
         // Camera motion is applied only here; feedback and trace history remain in world coordinates.
         gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);bindPass(program);
         gl.drawArrays(gl.TRIANGLES,0,6);diagnostics.frames++;
-      } catch(error) { fail(error); return; }
-    }
+        perf?.endGpu();perf?.endFrame(performance.now()-submittedAt,[canvas.width,canvas.height],[fieldWidth,fieldHeight]);
+      } catch(error) { perf?.endGpu();fail(error); return; }
+    } else perf?.idle();
     request=requestAnimationFrame(frame);
   }
   request=requestAnimationFrame(frame);
@@ -389,13 +433,13 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     },
     get position() { return diagnostics.position; },
     setPaused(value: boolean) { paused=value; diagnostics.paused=value; },
-    reset() { target=0; clearExcitation(); clearFields(); lastMilk=-1; },
+    reset() { target=0; clearExcitation(); clearFields(); lastSignal=-1;sources.forEach(source=>{source.lastRender=-1;}); },
     dispose() {
       disposed=true;cancelAnimationFrame(request);removeEventListener('resize',resize);canvas.removeEventListener('webglcontextlost',lost);
       sources.forEach(({source,texture})=>{gl.deleteTexture(texture); source.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();});
-      gl.deleteTexture(signalTexture);
+      perf?.dispose();gl.deleteTexture(signalTexture);gl.deleteTexture(maskTexture);gl.deleteFramebuffer(maskFramebuffer);
       fields.forEach(({texture,framebuffer})=>{gl.deleteTexture(texture);gl.deleteFramebuffer(framebuffer);});
-      gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteProgram(feedbackProgram);shaders.forEach(value=>gl.deleteShader(value));
+      gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteProgram(feedbackProgram);gl.deleteProgram(maskProgram);shaders.forEach(value=>gl.deleteShader(value));
     },
   };
 }

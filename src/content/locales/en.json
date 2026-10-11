@@ -110,6 +110,17 @@
       "title": "Funkadelic Astronaut",
       "medium": "Future rock",
       "description": "A New Jersey future rock trio. Songs, live performances and a world of sound built around the band."
+    },
+    "perf": {
+      "label": "Rendering performance",
+      "timing": "RAF {{fps}} fps · interval p95 {{raf}} ms",
+      "cpu": "CPU submission {{mean}} ms · p95 {{p95}} ms",
+      "gpu": "Compositor GPU {{ms}} ms (preset contexts excluded)",
+      "gpuUnavailable": "Compositor GPU timer unavailable",
+      "size": "Canvas {{canvas}} · field {{field}} · mesh 24 × 18",
+      "context": "WebGL2 · requested {{power}}",
+      "paused": "Paused",
+      "running": "Running"
     }
   }
 }
