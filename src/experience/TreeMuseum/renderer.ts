@@ -16,14 +16,9 @@ in vec2 aPosition;out vec2 uv;
 void main(){uv=aPosition*.5+.5;gl_Position=vec4(aPosition,0.,1.);}`;
 const fragment=`#version 300 es
 precision highp float;in vec2 uv;out vec4 color;
-uniform sampler2D nativeField;uniform sampler2D spineSignal;uniform float position;uniform float worldWidth;
+uniform sampler2D nativeField;
 void main(){
-  float y=mod((1.-uv.y)*6.+position,6.);float v=y/6.;
-  vec3 field=texture(nativeField,vec2(uv.x,1.-uv.y)).rgb;
-  float sampleValue=(texture(spineSignal,vec2(v+.5/512.,.5)).r*255.-128.)/128.;
-  float distance=abs((uv.x-.5)*worldWidth-sampleValue*.65);
-  float exposure=.90*(.10+.90*exp(-.85*distance));
-  color=vec4(field*exposure,1.);
+  color=vec4(texture(nativeField,vec2(uv.x,1.-uv.y)).rgb,1.);
 }`;
 
 export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:string)=>void,selectedTheme:ThemeId=initialTheme()) {
@@ -43,8 +38,7 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
   const vs=shader(gl.VERTEX_SHADER,vertex),fs=shader(gl.FRAGMENT_SHADER,fragment),program=gl.createProgram()!;
   gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'aPosition');gl.linkProgram(program);
   if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program)||'Shader link failed');
-  gl.useProgram(program);gl.uniform1i(gl.getUniformLocation(program,'nativeField'),0);const positionUniform=gl.getUniformLocation(program,'position'),worldWidthUniform=gl.getUniformLocation(program,'worldWidth');
-  gl.uniform1i(gl.getUniformLocation(program,'spineSignal'),1);
+  gl.useProgram(program);gl.uniform1i(gl.getUniformLocation(program,'nativeField'),0);
   const buffer=gl.createBuffer()!;gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
   const source=document.createElement('canvas');source.width=source.height=tier.source;
@@ -54,10 +48,6 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,tier.source,tier.source,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-  const signalTexture=gl.createTexture()!;gl.bindTexture(gl.TEXTURE_2D,signalTexture);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,512,1,0,gl.RED,gl.UNSIGNED_BYTE,new Uint8Array(512).fill(128));
-  let feedPosition=0;const displayedSamples=new Uint8Array(512);
   const perf=new URLSearchParams(location.search).get('perf')==='1'?createPerformanceMonitor(gl,value=>{diagnostics.performance=value;}):null;
   const sampleCount = 1024;
   const audioLevels = {timeByteArray:new Uint8Array(sampleCount),timeByteArrayL:new Uint8Array(sampleCount),timeByteArrayR:new Uint8Array(sampleCount)};
@@ -192,11 +182,9 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
           diagnostics.nativeBands={bass:visualizer.renderer.audioLevels.bass,mid:visualizer.renderer.audioLevels.mid,treble:visualizer.renderer.audioLevels.treb};
           diagnostics.nativeFrames=visualizer.renderer.frameNum;diagnostics.nativePosition=wrap(spine.position);diagnostics.milkFrames++;diagnostics.waveformFeedTime=spine.time;
           gl.bindTexture(gl.TEXTURE_2D,texture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,source);
-          for(let i=0;i<512;i++)displayedSamples[i]=spine.samples[i]+128;
-          gl.bindTexture(gl.TEXTURE_2D,signalTexture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,512,1,gl.RED,gl.UNSIGNED_BYTE,displayedSamples);feedPosition=spine.position;
         }
         perf?.beginGpu();gl.useProgram(program);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);
-        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1f(positionUniform,feedPosition);gl.uniform1f(worldWidthUniform,spine.worldWidth);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,signalTexture);gl.drawArrays(gl.TRIANGLES,0,6);diagnostics.frames++;
+        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.drawArrays(gl.TRIANGLES,0,6);diagnostics.frames++;
         perf?.endGpu();perf?.endFrame(performance.now()-submittedAt,[canvas.width,canvas.height],diagnostics.nativeSize);
       } catch(error){perf?.endGpu();renderFailed=true;fail(error);
         if(pendingPreset){pendingPreset.reject(error);pendingPreset=null;try{loadPreset(goodPreset);diagnostics.presets=[goodName];lastRender=-1;renderFailed=false;}catch{/* Picker can still load a new candidate. */}}
@@ -223,6 +211,6 @@ export function createMuseumRenderer(canvas:HTMLCanvasElement,onError:(error:str
     },
     reset(){target=0;clearExcitation();clearNativeFeedback();lastSignal=-1;lastRender=-1;},
     dispose(){pendingPreset?.reject(new Error('Renderer disposed'));pendingPreset=null;disposed=true;cancelAnimationFrame(request);removeEventListener('resize',resize);canvas.removeEventListener('webglcontextlost',lost);source.removeEventListener('webglcontextlost',lost);
-      disposeSpine();perf?.dispose();gl.deleteTexture(texture);gl.deleteTexture(signalTexture);gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);nativeGl.getExtension('WEBGL_lose_context')?.loseContext();},
+      disposeSpine();perf?.dispose();gl.deleteTexture(texture);gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);nativeGl.getExtension('WEBGL_lose_context')?.loseContext();},
   };
 }

@@ -28,7 +28,7 @@ export function installNativeSpine(gl:WebGL2RenderingContext,renderer:NativeStag
   renderer.customWaveforms.forEach(wave=>{wave.drawCustomWaveform=(...args)=>{const [,left,right,freqL,freqR,globals,equations,part]=args;if(part) wave.generateWaveform(left,right,freqL,freqR,globals,equations,part,0);};});
   const shader=(type:number,source:string)=>{const value=gl.createShader(type)!;gl.shaderSource(value,source);gl.compileShader(value);if(!gl.getShaderParameter(value,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(value)||'Native spine compile failed');return value;};
   const vs=shader(gl.VERTEX_SHADER,`#version 300 es\nin vec2 point;in vec3 tint;out vec3 color;uniform float offset;void main(){gl_Position=vec4(point+vec2(offset,0.),0.,1.);color=tint;}`);
-  const fs=shader(gl.FRAGMENT_SHADER,`#version 300 es\nprecision highp float;in vec3 color;out vec4 outputColor;uniform float alpha;uniform float core;void main(){outputColor=vec4(mix(color,vec3(.88,.94,1.),core),alpha);}`);
+  const fs=shader(gl.FRAGMENT_SHADER,`#version 300 es\nprecision highp float;in vec3 color;out vec4 outputColor;uniform float alpha;uniform float core;void main(){outputColor=vec4(mix(color,vec3(.98,.99,1.),core),alpha);}`);
   const program=gl.createProgram()!;gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'point');gl.bindAttribLocation(program,1,'tint');gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program)||'Native spine link failed');
   const vao=gl.createVertexArray()!,buffer=gl.createBuffer()!;const points=new Float32Array((input.samples.length+1)*5);
   gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,points.byteLength,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,20,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,20,8);gl.bindVertexArray(null);
@@ -47,9 +47,10 @@ export function installNativeSpine(gl:WebGL2RenderingContext,renderer:NativeStag
     const previousVao=gl.getParameter(gl.VERTEX_ARRAY_BINDING),previousProgram=gl.getParameter(gl.CURRENT_PROGRAM),previousBuffer=gl.getParameter(gl.ARRAY_BUFFER_BINDING);
     const blend=gl.isEnabled(gl.BLEND),eqRgb=gl.getParameter(gl.BLEND_EQUATION_RGB),eqAlpha=gl.getParameter(gl.BLEND_EQUATION_ALPHA),srcRgb=gl.getParameter(gl.BLEND_SRC_RGB),dstRgb=gl.getParameter(gl.BLEND_DST_RGB),srcAlpha=gl.getParameter(gl.BLEND_SRC_ALPHA),dstAlpha=gl.getParameter(gl.BLEND_DST_ALPHA);
     gl.useProgram(program);gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,points);gl.enable(gl.BLEND);gl.blendEquation(gl.FUNC_ADD);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.uniform1f(core,0);gl.uniform1f(alpha,.15);
-    for(const dx of [-3,-2,-1,1,2,3]){gl.uniform1f(offset,dx*2/renderer.texsizeX);gl.drawArrays(gl.LINE_STRIP,0,input.samples.length+1);}
-    gl.uniform1f(core,1);gl.uniform1f(alpha,.94);gl.uniform1f(offset,0);gl.drawArrays(gl.LINE_STRIP,0,input.samples.length+1);
+    gl.uniform1f(core,0);
+    // Fixed Gaussian halo, deposited into native history with the same sample geometry.
+    for(const dx of [-4,-3,-2,-1,1,2,3,4]){gl.uniform1f(alpha,.42*Math.exp(-dx*dx/(2*1.6*1.6)));gl.uniform1f(offset,dx*2/renderer.texsizeX);gl.drawArrays(gl.LINE_STRIP,0,input.samples.length+1);}
+    gl.uniform1f(core,1);gl.uniform1f(alpha,1);gl.uniform1f(offset,0);gl.drawArrays(gl.LINE_STRIP,0,input.samples.length+1);
     gl.bindVertexArray(previousVao);gl.useProgram(previousProgram);gl.bindBuffer(gl.ARRAY_BUFFER,previousBuffer);gl.blendEquationSeparate(eqRgb,eqAlpha);gl.blendFuncSeparate(srcRgb,dstRgb,srcAlpha,dstAlpha);if(!blend)gl.disable(gl.BLEND);
   };
   return ()=>{renderer.basicWaveform.drawBasicWaveform=original;renderer.customWaveforms.forEach((wave,index)=>{wave.drawCustomWaveform=originals[index];});gl.deleteVertexArray(vao);gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);};

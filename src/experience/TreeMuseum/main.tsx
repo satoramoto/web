@@ -127,7 +127,6 @@ function TreeMuseum() {
       <span>{perf.renderer}</span>
       <button type="button" aria-pressed={injecting} onClick={()=>{renderer.current?.setInjecting(!injecting);setInjecting(!injecting);}}>{t(injecting?'museum.perf.stopInjection':'museum.perf.resumeInjection')}</button>
     </output>}
-    <div className="museum-grain" aria-hidden="true" />
     <header className="museum-heading"><span>{t('museum.heading')}</span><span className="museum-heading-line" /></header>
     <div className="museum-controls">
       <button type="button" aria-label={t(paused?'museum.resume':'museum.pause')} title={t(paused?'museum.resume':'museum.pause')} aria-pressed={paused} onClick={()=>setPaused(!paused)}>{paused?<span aria-hidden="true">▷</span>:<span aria-hidden="true">Ⅱ</span>}</button>
