@@ -2,6 +2,9 @@ Tree of Life live renderer credits
 
 Butterchurn 2.6.7 by Jordan Berg: https://github.com/jberg/butterchurn
 Preset package: butterchurn-presets 2.4.7
+Full converted collection: 1,754 presets.
+Original author/preset names: preset-library/catalogue.json
+Individual sources and MIT notice: preset-library/
 
 Preset authors and original names:
 flexi + fishbrain - neon mindblob grafitti

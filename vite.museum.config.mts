@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -11,6 +11,7 @@ export default defineConfig({
       const output = resolve('dist-museum');
       const html = readFileSync(resolve(output, 'museum/index.html'), 'utf8');
       writeFileSync(resolve(output, 'index.html'), html.replaceAll('../assets/', './assets/'));
+      cpSync(resolve('public/preset-library'), resolve(output, 'preset-library'), {recursive:true});
       copyFileSync(resolve('public/museum/credits.txt'), resolve(output, 'credits.txt'));
       copyFileSync(resolve('assets/fonts/archivo/OFL.txt'), resolve(output, 'assets/Archivo-OFL.txt'));
       writeFileSync(resolve(output, '.nojekyll'), '');

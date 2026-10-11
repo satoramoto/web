@@ -140,6 +140,21 @@
       "prism": "Prism Temple",
       "garden": "Liquid Garden",
       "horizon": "Event Horizon"
+    },
+    "presets": {
+      "browse": "Browse {{count}} presets",
+      "title": "MilkDrop preset library",
+      "previous": "Previous",
+      "next": "Next",
+      "shuffle": "Shuffle",
+      "search": "Search presets",
+      "searchHint": "Preset or author name",
+      "loading": "Loading preset…",
+      "failed": "This preset could not render. Try another preset or retry.",
+      "results": "Showing {{shown}} of {{count}} presets",
+      "more": "Show more",
+      "retry": "Retry selection",
+      "close": "Close preset library"
     }
   }
 }

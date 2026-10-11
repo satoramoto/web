@@ -5,6 +5,11 @@ declare module 'butterchurn' {
     timeByteArrayR: Uint8Array;
   }
   interface NativeRenderer {
+    prevWarpShader:{shaderProgram:WebGLProgram};prevCompShader:{shaderProgram:WebGLProgram};
+    warpShader:{shaderProgram:WebGLProgram};compShader:{shaderProgram:WebGLProgram};
+    customShapes:{setupShapeBuffers:(...args:unknown[])=>void;drawCustomShapeInstance:(...args:unknown[])=>void}[];
+    basicWaveform:{drawBasicWaveform:(...args:unknown[])=>void};
+    customWaveforms:{drawCustomWaveform:(...args:unknown[])=>void;generateWaveform:(...args:unknown[])=>boolean}[];
     targetFrameBuffer:WebGLFramebuffer;prevFrameBuffer:WebGLFramebuffer;compFrameBuffer:WebGLFramebuffer;
     targetTexture:WebGLTexture;prevTexture:WebGLTexture;frameNum:number;texsizeX:number;texsizeY:number;
     blurShader1:{blurHorizontalFrameBuffer:WebGLFramebuffer;blurVerticalFrameBuffer:WebGLFramebuffer};

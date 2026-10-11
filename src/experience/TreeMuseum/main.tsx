@@ -4,6 +4,8 @@ import { t } from '../../i18n/copy';
 import { createMuseumRenderer } from './renderer';
 import type { MuseumPerformance } from './performance';
 import { themes, initialTheme, type ThemeId } from './themes';
+import { PresetBrowser } from './PresetBrowser';
+import { initialPreset, loadLibraryPreset, presetCatalogue } from './preset-library';
 import './museum.css';
 
 const projects = [
@@ -15,6 +17,11 @@ const projects = [
 function TreeMuseum() {
   const perfEnabled=new URLSearchParams(location.search).get('perf')==='1';
   const [theme,setTheme]=useState<ThemeId>(initialTheme);
+  const startingPreset=useRef(initialPreset());
+  const [presetId,setPresetId]=useState<string|null>(null);
+  const [pickerOpen,setPickerOpen]=useState(false),[presetLoading,setPresetLoading]=useState(false),[presetError,setPresetError]=useState(false);
+  const [retryPresetId,setRetryPresetId]=useState<string|null>(null);
+  const selectionRequest=useRef(0),selectionAbort=useRef<AbortController|null>(null);
   const themeButtons=useRef<(HTMLButtonElement|null)[]>([]);
   const [perf,setPerf]=useState<MuseumPerformance|null>(null);
   const [injecting,setInjecting]=useState(true);
@@ -27,12 +34,30 @@ function TreeMuseum() {
   const [error,setError] = useState(false);
   const [explored,setExplored] = useState(false);
   const activeRef = useRef(active); activeRef.current=active;
+  const pickerRef=useRef(false);pickerRef.current=pickerOpen;
+  async function selectLibrary(id:string) {
+    const candidate=presetCatalogue.find(preset=>preset.id===id);if(!candidate)return;
+    const request=++selectionRequest.current;selectionAbort.current?.abort();const controller=new AbortController();selectionAbort.current=controller;
+    setPresetLoading(true);setPresetError(false);setRetryPresetId(id);
+    try{const preset=await loadLibraryPreset(id,controller.signal);if(request!==selectionRequest.current||!renderer.current)return;
+      await renderer.current.setPreset(preset,candidate.name);if(request!==selectionRequest.current)return;
+      setPresetId(id);setPresetError(false);setError(false);
+      const url=new URL(location.href);url.searchParams.set('preset',id);history.replaceState(null,'',url);
+      try{localStorage.setItem('treeMuseum.preset',id);}catch{/* Storage can be disabled. */}
+    }catch{if(request===selectionRequest.current&&!controller.signal.aborted){setPresetError(true);setError(false);}}
+    finally{if(request===selectionRequest.current)setPresetLoading(false);}
+  }
+  function chooseTheme(value:ThemeId){
+    selectionRequest.current++;selectionAbort.current?.abort();setPresetId(null);setPresetLoading(false);setPresetError(false);setError(false);renderer.current?.setTheme(value);setTheme(value);
+    const url=new URL(location.href);url.searchParams.delete('preset');url.searchParams.set('theme',value);history.replaceState(null,'',url);try{localStorage.removeItem('treeMuseum.preset');}catch{/* Storage may be disabled. */}
+  }
   useEffect(()=> {
     document.title=t('museum.documentTitle');
     let labelsFrame=0, previousPosition=-1;
     const perfTimer=perfEnabled?window.setInterval(()=>setPerf(window.__treeMuseum?.performance||null),1000):0;
     try { renderer.current=createMuseumRenderer(canvas.current!,()=>setError(true),theme); }
     catch { setError(true); }
+    if(startingPreset.current)void selectLibrary(startingPreset.current);
     const updateLabels = () => {
       const position=renderer.current?.position || 0;
       if(Math.abs(position-previousPosition)>1e-7) labels.current.forEach((label,index)=>{
@@ -47,7 +72,7 @@ function TreeMuseum() {
     updateLabels();
     const move = (delta: number) => {renderer.current?.move(delta);setExplored(true);};
     const wheel = (event: WheelEvent) => {
-      if(activeRef.current!==null || event.ctrlKey) return;
+      if(activeRef.current!==null || pickerRef.current || event.ctrlKey) return;
       event.preventDefault();
       const pixels=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?innerHeight:1);
       move(Math.max(-1,Math.min(1,pixels*.003)));
@@ -55,12 +80,13 @@ function TreeMuseum() {
     let touchY=0;
     const touchStart=(event:TouchEvent)=>{touchY=event.touches[0].clientY;};
     const touchMove=(event:TouchEvent)=>{
-      if(activeRef.current!==null) return;
+      if(activeRef.current!==null||pickerRef.current) return;
       event.preventDefault();const y=event.touches[0].clientY;move((touchY-y)*.009);touchY=y;
     };
     const key=(event:KeyboardEvent)=>{
-      if(activeRef.current!==null) return;
+      if(activeRef.current!==null||pickerRef.current) return;
       const target=event.target;
+      if(target instanceof HTMLElement&&target.closest('input,textarea,select,[contenteditable]'))return;
       if(event.key===' ' && target instanceof HTMLElement && target.closest('button,a')) return;
       const deltas:Record<string,number>={ArrowDown:.35,ArrowUp:-.35,PageDown:2,PageUp:-2,' ':event.shiftKey?-2:2};
       if(event.key in deltas) {event.preventDefault();move(deltas[event.key]);}
@@ -69,7 +95,7 @@ function TreeMuseum() {
     addEventListener('wheel',wheel,{passive:false});addEventListener('touchstart',touchStart,{passive:true});
     addEventListener('touchmove',touchMove,{passive:false});addEventListener('keydown',key);
     return()=>{
-      clearInterval(perfTimer);cancelAnimationFrame(labelsFrame);renderer.current?.dispose();renderer.current=null;
+      selectionRequest.current++;selectionAbort.current?.abort();clearInterval(perfTimer);cancelAnimationFrame(labelsFrame);renderer.current?.dispose();renderer.current=null;
       removeEventListener('wheel',wheel);removeEventListener('touchstart',touchStart);removeEventListener('touchmove',touchMove);removeEventListener('keydown',key);
     };
   },[]);
@@ -88,7 +114,7 @@ function TreeMuseum() {
   const close=()=>{const previous=active;setActive(null);if(previous!==null) requestAnimationFrame(()=>labels.current[previous]?.focus());};
   return <main className="tree-museum" aria-label={t('museum.label')}>
     <canvas ref={canvas} className="museum-canvas" aria-hidden="true" />
-    {perfEnabled && perf && <output id="museum-performance" className="museum-performance" aria-label={t('museum.perf.label')} data-native-frames={window.__treeMuseum?.nativeFrames} data-native-deposits={window.__treeMuseum?.nativeDeposits} data-native-target-bound={String(window.__treeMuseum?.nativeTargetBound)} data-injecting={String(injecting)} data-quality={window.__treeMuseum?.quality.tier} data-quality-transitions={window.__treeMuseum?.quality.transitions} data-fps={perf.fps.toFixed(1)} data-raf-p95-ms={perf.rafP95Ms.toFixed(2)} data-cpu-p95-ms={perf.cpuP95Ms.toFixed(2)} data-compositor-gpu-ms={perf.compositorGpuMs?.toFixed(2)||'unavailable'}>
+    {perfEnabled && perf && <output id="museum-performance" className="museum-performance" aria-label={t('museum.perf.label')} data-native-position={window.__treeMuseum?.nativePosition.toFixed(3)} data-native-frames={window.__treeMuseum?.nativeFrames} data-native-deposits={window.__treeMuseum?.nativeDeposits} data-native-target-bound={String(window.__treeMuseum?.nativeTargetBound)} data-injecting={String(injecting)} data-quality={window.__treeMuseum?.quality.tier} data-quality-transitions={window.__treeMuseum?.quality.transitions} data-fps={perf.fps.toFixed(1)} data-raf-p95-ms={perf.rafP95Ms.toFixed(2)} data-cpu-p95-ms={perf.cpuP95Ms.toFixed(2)} data-compositor-gpu-ms={perf.compositorGpuMs?.toFixed(2)||'unavailable'}>
       <span>{t('museum.perf.timing',{fps:perf.fps.toFixed(1),raf:perf.rafP95Ms.toFixed(2)})}</span>
       <span>{t('museum.perf.cpu',{mean:perf.cpuMeanMs.toFixed(2),p95:perf.cpuP95Ms.toFixed(2)})}</span>
       <span>{perf.compositorGpuMs===null?t('museum.perf.gpuUnavailable'):t('museum.perf.gpu',{ms:perf.compositorGpuMs.toFixed(2)})}</span>
@@ -107,11 +133,12 @@ function TreeMuseum() {
       <button type="button" aria-label={t('museum.reset')} title={t('museum.reset')} onClick={()=>renderer.current?.reset()}><span aria-hidden="true">↺</span></button>
     </div>
     <div className="museum-themes" role="toolbar" aria-label={t('museum.themes.label')}>
-      {themes.map((item,index)=><button key={item.id} ref={button=>{themeButtons.current[index]=button;}} type="button" aria-pressed={theme===item.id} onClick={()=>setTheme(item.id)} onKeyDown={event=>{
+      {themes.map((item,index)=><button key={item.id} ref={button=>{themeButtons.current[index]=button;}} type="button" aria-pressed={presetId===null&&theme===item.id} onClick={()=>chooseTheme(item.id)} onKeyDown={event=>{
         const next=event.key==='ArrowRight'?(index+1)%themes.length:event.key==='ArrowLeft'?(index+themes.length-1)%themes.length:event.key==='Home'?0:event.key==='End'?themes.length-1:-1;
-        if(next<0) return;event.preventDefault();event.stopPropagation();setTheme(themes[next].id);themeButtons.current[next]?.focus();
+        if(next<0) return;event.preventDefault();event.stopPropagation();chooseTheme(themes[next].id);themeButtons.current[next]?.focus();
       }}>{t(item.label)}</button>)}
     </div>
+    <PresetBrowser retryId={retryPresetId} selected={presetId||presetCatalogue.find(preset=>preset.name===themes.find(item=>item.id===theme)!.name)?.id||null} name={presetCatalogue.find(preset=>preset.id===presetId)?.name||themes.find(item=>item.id===theme)!.name} loading={presetLoading} error={presetError} onSelect={id=>{void selectLibrary(id);}} onOpen={setPickerOpen} />
     <nav className="museum-projects" aria-label={t('museum.projects')}>
       {projects.map((project,index)=><button className={`museum-project museum-project-${index}`} key={project.id} ref={element=>{labels.current[index]=element;}} type="button" style={{top:`${(1+index*2)/6*100}%`}} onClick={()=>setActive(index)} aria-haspopup="dialog">
         <span className="museum-project-name">{t(project.title)}</span><span className="museum-leader" aria-hidden="true"><i /></span>

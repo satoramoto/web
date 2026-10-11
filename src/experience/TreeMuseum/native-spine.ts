@@ -2,47 +2,60 @@ import type { ThemeId } from './themes';
 
 type Values=Record<string,number>;
 type Equation=(values:Values)=>Values;
-interface AuthoredPreset {
-  baseVals:Values; init_eqs_str?:string; frame_eqs_str?:string; pixel_eqs_str?:string;
-  shapes:unknown[]; waves:unknown[]; warp:string; comp:string;
-}
+interface AuthoredPart {baseVals:Values;init_eqs_str?:string;frame_eqs_str?:string;point_eqs_str?:string}
+interface AuthoredPreset extends AuthoredPart {pixel_eqs_str?:string;shapes:AuthoredPart[];waves:AuthoredPart[];warp:string;comp:string}
 export interface NativeSpineInput {
-  samples:Uint8Array; envelope:Float32Array; time:number; worldWidth:number; theme:ThemeId; injecting:boolean;
-  onDeposit:()=>void;
+  samples:Uint8Array;envelope:Float32Array;time:number;position:number;worldWidth:number;theme:ThemeId;injecting:boolean;onDeposit:()=>void;
 }
-// These trusted, locally vendored preset equations use the same compilation model as pinned Butterchurn2.6.7.
 const compile=(source=''):Equation=>new Function('a',`${source}; return a;`) as Equation;
-export function createNativeSpinePreset(authored:unknown,input:NativeSpineInput) {
+export function createNativeSpinePreset(authored:unknown,identityComp=false) {
   const preset=structuredClone(authored) as AuthoredPreset;
   const frame=compile(preset.frame_eqs_str);
-  const colors:Record<ThemeId,[number,number,number]>={prism:[.35,.58,1],garden:[.24,.85,.62],horizon:[.72,.50,1]};
   return {...preset,
-    // Spiral's original final comp rotates the freshly drawn target; show it directly instead.
-    comp:input.theme==='horizon'?'shader_body { ret = texture(sampler_main, uv).rgb; }':preset.comp,
-    baseVals:{...preset.baseVals,wave_a:0,darken_center:0,ob_a:0,ib_a:0,mv_a:0},
+    comp:identityComp?'shader_body { ret = texture(sampler_main, uv).rgb; }':preset.comp,
+    baseVals:{...preset.baseVals,darken_center:0,ob_a:0,ib_a:0,mv_a:0},
     init_eqs:compile(preset.init_eqs_str),
-    frame_eqs:(a:Values)=>{
-      const result=frame(a);result.wave_a=0;result.darken_center=0;result.ob_a=0;result.ib_a=0;result.mv_a=0;
-      return result;
-    },
+    frame_eqs:(a:Values)=>{const result=frame(a);result.darken_center=0;result.ob_a=0;result.ib_a=0;result.mv_a=0;return result;},
     pixel_eqs:preset.pixel_eqs_str?compile(preset.pixel_eqs_str):'',
-    // The selected examples have no invisible megabuf-wave dependencies. Authored warp/comp stay intact.
-    shapes:[],
-    waves:[{
-      baseVals:{enabled:1,samples:512,sep:0,scaling:1,smoothing:0,spectrum:0,usedots:0,thick:1,additive:0,r:1,g:1,b:1,a:.5},
-      init_eqs:(a:Values)=>a,
-      frame_eqs:(a:Values)=>{if(input.injecting) input.onDeposit();return a;},
-      point_eqs:(a:Values)=>{
-        const sample=a.sample, index=Math.floor(sample*input.samples.length)%input.samples.length;
-        const signed=(input.samples[index]-128)/127, envelope=input.envelope[index], y=sample*6;
-        const trunk=.32*Math.sin(y*Math.PI/3+.4)+.15*Math.sin(y*Math.PI+input.time*.07);
-        // The native canvas is square, so Butterchurn invAspectx/invAspecty are both1.
-        a.x=.5+(trunk+signed*.3)/input.worldWidth;a.y=sample;
-        const color=colors[input.theme];
-        a.r=color[0]+envelope*.15;a.g=color[1]+envelope*.10;a.b=color[2];
-        a.a=input.injecting?.65+envelope*.18:0;
-        return a;
-      },
-    }],
+    // Preserve all authored callbacks and slots, including shared-buffer side effects.
+    waves:preset.waves.map(wave=>({...wave,init_eqs:compile(wave.init_eqs_str),frame_eqs:compile(wave.frame_eqs_str),point_eqs:wave.point_eqs_str?compile(wave.point_eqs_str):''})),
+    shapes:preset.shapes.map(shape=>({...shape,init_eqs:compile(shape.init_eqs_str),frame_eqs:compile(shape.frame_eqs_str)})),
   };
+}
+interface WaveDrawer {drawCustomWaveform:(...args:unknown[])=>void;generateWaveform:(...args:unknown[])=>boolean}
+interface ShapeDrawer {setupShapeBuffers:(...args:unknown[])=>void;drawCustomShapeInstance:(...args:unknown[])=>void}
+interface NativeStage {customShapes:ShapeDrawer[];basicWaveform:{drawBasicWaveform:(...args:unknown[])=>void};customWaveforms:WaveDrawer[];texsizeX:number;texsizeY:number}
+export function installNativeSpine(gl:WebGL2RenderingContext,renderer:NativeStage,input:NativeSpineInput) {
+  const original=renderer.basicWaveform.drawBasicWaveform;
+  const shapeOriginals=renderer.customShapes.map(shape=>({setup:shape.setupShapeBuffers,draw:shape.drawCustomShapeInstance}));
+  renderer.customShapes.forEach(shape=>{shape.setupShapeBuffers=()=>{};shape.drawCustomShapeInstance=()=>{};});
+  const originals=renderer.customWaveforms.map(wave=>wave.drawCustomWaveform);
+  renderer.customWaveforms.forEach(wave=>{wave.drawCustomWaveform=(...args)=>{const [,left,right,freqL,freqR,globals,equations,part]=args;if(part) wave.generateWaveform(left,right,freqL,freqR,globals,equations,part,0);};});
+  const shader=(type:number,source:string)=>{const value=gl.createShader(type)!;gl.shaderSource(value,source);gl.compileShader(value);if(!gl.getShaderParameter(value,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(value)||'Native spine compile failed');return value;};
+  const vs=shader(gl.VERTEX_SHADER,`#version 300 es\nin vec2 point;in vec3 tint;out vec3 color;uniform float offset;void main(){gl_Position=vec4(point+vec2(offset,0.),0.,1.);color=tint;}`);
+  const fs=shader(gl.FRAGMENT_SHADER,`#version 300 es\nprecision highp float;in vec3 color;out vec4 outputColor;uniform float alpha;uniform float core;void main(){outputColor=vec4(mix(color,vec3(.88,.94,1.),core),alpha);}`);
+  const program=gl.createProgram()!;gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'point');gl.bindAttribLocation(program,1,'tint');gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program)||'Native spine link failed');
+  const vao=gl.createVertexArray()!,buffer=gl.createBuffer()!;const points=new Float32Array((input.samples.length+1)*5);
+  gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,points.byteLength,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,20,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,20,8);gl.bindVertexArray(null);
+  const offset=gl.getUniformLocation(program,'offset'),alpha=gl.getUniformLocation(program,'alpha'),core=gl.getUniformLocation(program,'core');
+  renderer.basicWaveform.drawBasicWaveform=()=>{
+    if(!input.injecting)return;input.onDeposit();
+    const colors:Record<ThemeId,number[]>={prism:[.4,.6,1],garden:[.3,.86,.66],horizon:[.72,.5,1]},color=colors[input.theme];
+    for(let i=0;i<=input.samples.length;i++){
+      const screenY=i/input.samples.length*6,y=((screenY+input.position)%6+6)%6;
+      const sample=y/6*input.samples.length,index=Math.floor(sample)%input.samples.length,next=(index+1)%input.samples.length,fraction=sample-Math.floor(sample);
+      const signed=((input.samples[index]*(1-fraction)+input.samples[next]*fraction)-128)/127;
+      const trunk=.32*Math.sin(y*Math.PI/3+.4)+.15*Math.sin(y*Math.PI+input.time*.07);
+      points[i*5]=2*(trunk+signed*.3)/input.worldWidth;points[i*5+1]=1-2*screenY/6;
+      for(let channel=0;channel<3;channel++)points[i*5+2+channel]=color[channel]+input.envelope[index]*.08;
+    }
+    const previousVao=gl.getParameter(gl.VERTEX_ARRAY_BINDING),previousProgram=gl.getParameter(gl.CURRENT_PROGRAM),previousBuffer=gl.getParameter(gl.ARRAY_BUFFER_BINDING);
+    const blend=gl.isEnabled(gl.BLEND),eqRgb=gl.getParameter(gl.BLEND_EQUATION_RGB),eqAlpha=gl.getParameter(gl.BLEND_EQUATION_ALPHA),srcRgb=gl.getParameter(gl.BLEND_SRC_RGB),dstRgb=gl.getParameter(gl.BLEND_DST_RGB),srcAlpha=gl.getParameter(gl.BLEND_SRC_ALPHA),dstAlpha=gl.getParameter(gl.BLEND_DST_ALPHA);
+    gl.useProgram(program);gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,points);gl.enable(gl.BLEND);gl.blendEquation(gl.FUNC_ADD);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform1f(core,0);gl.uniform1f(alpha,.15);
+    for(const dx of [-3,-2,-1,1,2,3]){gl.uniform1f(offset,dx*2/renderer.texsizeX);gl.drawArrays(gl.LINE_STRIP,0,input.samples.length+1);}
+    gl.uniform1f(core,1);gl.uniform1f(alpha,.94);gl.uniform1f(offset,0);gl.drawArrays(gl.LINE_STRIP,0,input.samples.length+1);
+    gl.bindVertexArray(previousVao);gl.useProgram(previousProgram);gl.bindBuffer(gl.ARRAY_BUFFER,previousBuffer);gl.blendEquationSeparate(eqRgb,eqAlpha);gl.blendFuncSeparate(srcRgb,dstRgb,srcAlpha,dstAlpha);if(!blend)gl.disable(gl.BLEND);
+  };
+  return ()=>{renderer.customShapes.forEach((shape,index)=>{shape.setupShapeBuffers=shapeOriginals[index].setup;shape.drawCustomShapeInstance=shapeOriginals[index].draw;});renderer.basicWaveform.drawBasicWaveform=original;renderer.customWaveforms.forEach((wave,index)=>{wave.drawCustomWaveform=originals[index];});gl.deleteVertexArray(vao);gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);};
 }
