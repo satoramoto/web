@@ -143,7 +143,7 @@ void main() {
   vec3 detail=clamp((mixed-vec3(gray))*1.35+gray,0.,1.)*1.4;
   float amplitude=abs(signedWave);
   float width=.09+signal.b*.48+amplitude*.12;
-  float emission=exp(-dx*dx/(width*width))*(.065+signal.b*1.8+amplitude*.25)*signal.a;
+  float emission=exp(-dx*dx/(width*width))*(.065+signal.b*1.15+amplitude*.25)*signal.a;
   vec3 injected=clamp(detail*min(1.6,emission),0.,1.);
   // Backtrace away from the same signed sample position. Old emission travels out into quiet space.
   float side=dx/sqrt(dx*dx+.003);
@@ -158,9 +158,9 @@ void main() {
   velocity+=(normal*flow.x+tangent*flow.y)*(theme==1?.18:.09);
   vec2 advected=vec2(clamp(uv.x-velocity.x*feedbackDelta,0.,1.),fract(uv.y-velocity.y*feedbackDelta));
   vec3 previous=texture(sharedField,advected).rgb;
-  float retention=exp(-feedbackDelta*(theme==1?.85:1.15));
+  float retention=exp(-feedbackDelta*(theme==1?.55:.75));
   vec3 retained=freshField>0.5?vec3(0.):previous*retention;
-  float exposure=freshField>0.5?1.:1.-exp(-feedbackDelta*18.);
+  float exposure=freshField>0.5?1.:1.-exp(-feedbackDelta*6.5);
   // Bounded screen injection exposes local preset detail quickly; decay independently controls its wake.
   color=vec4(retained+injected*exposure*(1.-retained),1.);
 }
@@ -170,20 +170,16 @@ void main() {
   float y=mod((1.-uv.y)*6.+position,6.);
   float x=(uv.x-.5)*worldWidth();
   float stem=trunk(y);
-  // Transported preset RGB is presented as advancing curved phase fronts, not continuous sideways bars.
+  // Continuous distance falloff replaces repeating bright/dark phase fronts entirely.
   vec4 centerSignal=signalAt(y,0.);
   float broadSpine=spineAt(y,centerSignal)*.5+spineAt(y+.20,signalAt(y+.20,0.))*.25+spineAt(y-.20,signalAt(y-.20,0.))*.25;
-  float outward=theme==2?2.2:theme==0?1.65:1.1;
   float distance=abs(x-broadSpine);
-  float phase=distance*17.-clock*outward*17.+.5*sin(y*PI/3.+clock*.17);
-  float front=pow(.5+.5*cos(phase),2.4);
-  float nearEmitter=exp(-pow(x-spineAt(y,centerSignal),2.)*90.);
-  float crest=max(.10+front*.90,nearEmitter*.9);
-  // Short integration along the crest joins thin source scanlines without blurring across its normal.
+  float attenuation=.10+.90*exp(-distance*.7);
+  // Gentle longitudinal integration joins source scanlines into one continuous transported wake.
   vec3 wake=texture(sharedField,vec2(uv.x,y/6.)).rgb*.5;
   wake+=texture(sharedField,vec2(uv.x,fract((y+.09)/6.))).rgb*.25;
   wake+=texture(sharedField,vec2(uv.x,fract((y-.09)/6.))).rgb*.25;
-  vec3 result=wake*crest+vec3(.001,.002,.006);
+  vec3 result=wake*attenuation+vec3(.001,.002,.006);
   // A sparse contour gives the tree structure without the old repeated fan of eighteen rails per layer.
   vec2 limbs=texture(branchMask,vec2(uv.x,y/6.)).rg;
   result+=paletteAt(y)*limbs.y*.035;
@@ -199,13 +195,13 @@ void main() {
     float ghostDistance=abs(x-stem-waveform-age*.028);
     float fade=exp(-age*2.5)*past.a;
     vec3 ghostColor=mix(vec3(.19,.33,.82),vec3(.64,.42,1.),age/.66);
-    result+=ghostColor*exp(-ghostDistance*ghostDistance*6500.)*(.028+past.b*.72)*fade;
+    result+=ghostColor*exp(-ghostDistance*ghostDistance*6500.)*(.028+past.b*.45)*fade;
     result+=ghostColor*exp(-ghostDistance*ghostDistance*210.)*past.b*.045*fade;
   }
   vec4 signal=signalAt(y,0.);
   float waveDistance=abs(x-spineAt(y,signal));
   vec3 spineColor=mix(vec3(.27,.5,1.),vec3(.95,.83,1.),.45+signal.b*.4);
-  result+=spineColor*exp(-waveDistance*waveDistance*6500.)*(.18+signal.b*1.65)*signal.a;
+  result+=spineColor*exp(-waveDistance*waveDistance*6500.)*(.18+signal.b*.95)*signal.a;
   result+=vec3(.2,.38,.9)*exp(-waveDistance*waveDistance*210.)*(.055+signal.b*.48)*signal.a;
   }
   result*=1.-smoothstep(.24,.78,abs(uv.x-.5));
@@ -292,6 +288,8 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
   interface Pulse { born: number; origin: number; amplitude: number; speed: number; width: number; phase: number; harmonic: number }
   const pulses: Pulse[] = [];
   const history: SignalFrame[] = [];
+  const smoothLeft=new Float32Array(sampleCount), smoothRight=new Float32Array(sampleCount), smoothEnvelope=new Float32Array(sampleCount);
+  let lastSynthesis=-1;
   let gestureEnergy = 0, lastPulse = -1, randomState = 0x62f37a;
   const random = () => {
     randomState ^= randomState<<13;randomState ^= randomState>>>17;randomState ^= randomState<<5;
@@ -304,6 +302,11 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     const recycled=history.length>=128?history.shift():undefined;
     const left=recycled?.left||new Float32Array(sampleCount), right=recycled?.right||new Float32Array(sampleCount), envelopes=recycled?.envelope||new Float32Array(sampleCount);
     let energy = 0;
+    const initial=lastSynthesis<0, signalDelta=initial?0:Math.max(0,now-lastSynthesis);
+    lastSynthesis=now;
+    const signalAttack=1-Math.exp(-signalDelta/.10), signalRelease=1-Math.exp(-signalDelta/.26);
+    const envelopeAttack=1-Math.exp(-signalDelta/.18), envelopeRelease=1-Math.exp(-signalDelta/.50);
+    const ease=(previous:number,target:number,attack:number,release:number)=>initial?target:previous+(target-previous)*(Math.abs(target)>Math.abs(previous)?attack:release);
     for(let i=0;i<sampleCount;i++) {
       const y = i/sampleCount*6;
       const phase = y*Math.PI/3;
@@ -314,17 +317,17 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
         const age = now-pulse.born;
         if(age<0) continue;
         const distance = wrap(y-pulse.origin-pulse.speed*age+3)-3;
-        const strength = Math.exp(-distance*distance/(pulse.width*pulse.width))*Math.exp(-age*.5)*pulse.amplitude;
+        const strength = Math.exp(-distance*distance/(pulse.width*pulse.width))*Math.exp(-age*.5)*(1-Math.exp(-age/.22))*pulse.amplitude;
         envelope += strength;
         const carrier = phase*pulse.harmonic - now*(1.3+pulse.speed*.5)+pulse.phase;
         a += strength*(Math.sin(carrier)*.58+Math.sin(carrier*2-pulse.phase)*.21);
         b += strength*(Math.sin(carrier+.26)*.54+Math.sin(phase*(pulse.harmonic+3)+now*.8)*.18);
       }
       // Soft limiting and explicit byte saturation avoid Uint8Array's modulo overflow.
-      left[i] = Math.tanh(a*(1+gestureEnergy*.28));
-      right[i] = Math.tanh(b*(1+gestureEnergy*.28));
+      left[i]=smoothLeft[i]=ease(smoothLeft[i],Math.tanh(a*(1+gestureEnergy*.28)),signalAttack,signalRelease);
+      right[i]=smoothRight[i]=ease(smoothRight[i],Math.tanh(b*(1+gestureEnergy*.28)),signalAttack,signalRelease);
       energy += left[i]*left[i]+right[i]*right[i];
-      envelopes[i]=Math.min(1,envelope);
+      envelopes[i]=smoothEnvelope[i]=ease(smoothEnvelope[i],Math.min(1,envelope),envelopeAttack,envelopeRelease);
     }
     diagnostics.signalEnergy = Math.sqrt(energy/(sampleCount*2));
     diagnostics.pulseCount = pulses.length;
@@ -366,7 +369,8 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
     diagnostics.waveformFeedTime[index]=history[history.length-1].time;
   }
   function clearExcitation() {
-    pulses.length=0;history.length=0;gestureEnergy=0;lastPulse=-1;
+    pulses.length=0;history.length=0;gestureEnergy=0;lastPulse=-1;lastSynthesis=-1;
+    smoothLeft.fill(0);smoothRight.fill(0);smoothEnvelope.fill(0);
     diagnostics.pulseCount=0;uploadTraces();
   }
   let fieldWidth=tier.field[0], fieldHeight=tier.field[1];
@@ -501,7 +505,7 @@ export function createMuseumRenderer(canvas: HTMLCanvasElement, onError: (error:
       diagnostics.gestureCount++;
       gestureEnergy = Math.min(1,gestureEnergy+Math.abs(bounded)*.85);
       if(lastPulse<0 || time-lastPulse>.14) {
-        pulses.push({born:time,origin:wrap(current+2.1),amplitude:.55+Math.min(.7,Math.abs(bounded)*1.2)+random()*.2,
+        pulses.push({born:time,origin:wrap(current+2.1),amplitude:.35+Math.min(.45,Math.abs(bounded)*.8)+random()*.12,
           speed:1.2+random()*.65,width:.18+random()*.16,phase:random()*Math.PI*2,harmonic:10+Math.floor(random()*12)});
         if(pulses.length>10) pulses.shift();lastPulse=time;
       }
