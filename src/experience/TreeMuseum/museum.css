@@ -1,4 +1,4 @@
-@font-face{font-family:Museum Sans;src:url('/assets/fonts/archivo/Archivo-latin.woff2') format('woff2');font-display:swap}
+@font-face{font-family:Museum Sans;src:url('../../../assets/fonts/archivo/Archivo-latin.woff2') format('woff2');font-display:swap}
 :root{color-scheme:dark;font-family:Museum Sans,Arial,sans-serif;background:#020207;color:#ece8f2;font-synthesis:none;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}button,a{-webkit-tap-highlight-color:transparent}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:1px solid #d4c2ff;outline-offset:8px}
 .tree-museum{position:relative;width:100%;height:100%;min-height:280px;isolation:isolate;background:radial-gradient(ellipse at 57% 50%,#071127,transparent 60%),#020207;touch-action:none}

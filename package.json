@@ -10,7 +10,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "node --test tests/*.test.cjs && npm run test:legacy",
-    "test:stories": "vitest --project=storybook --run"
+    "test:stories": "vitest --project=storybook --run",
+    "build:museum": "tsc --noEmit && vite build --config vite.museum.config.mts"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.3.1",

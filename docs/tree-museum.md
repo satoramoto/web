@@ -1,6 +1,6 @@
 # Tree of Life museum POC
 
-`/museum/` is a separate Vite HTML entry. Its implementation lives in `src/experience/TreeMuseum/`; the band homepage remains at `/`. This route is a local portfolio exploration and is marked `noindex`. It has not been published as part of this assignment.
+`/museum/` is a separate Vite HTML entry. Its implementation lives in `src/experience/TreeMuseum/`; the band homepage remains at `/`. This route is a local portfolio exploration and is marked `noindex`. The separate portfolio deployment targets https://satoramoto.github.io/web/.
 
 The composition borrows the branching canopy, central blue eddy, peach roots and discreet museum labels from the generated visual reference. The artwork is rendered live rather than displaying that image. Butterchurn 2.6.7 renders three persistent WebGL canvases, which become textures in an independent WebGL2 shader compositor. A sparse branching mask and quiet crisp contours retain the tree structure. The previous eighteen static branch curves per layer have been removed. The presets supply moving detail to one normalized, spatially mixed field; the full original presets are not shown as three separate rectangles.
 
@@ -39,3 +39,7 @@ The fixed display/preset/feedback resolution caps reduce GPU work. Tradeoffs are
 Append `?perf=1` to `/museum/` for the opt-in DOM-visible HUD. It reports rolling RAF frequency and RAF-interval p95, renderer CPU-submission mean/p95, canvas and feedback dimensions, requested context preference and the exposed renderer string. CPU submission includes synthesis, destination rendering calls, uploads and compositor submission; it is not a GPU completion time. GPU timer queries, when supported, are asynchronous and discard disjoint results. Their timing covers only the compositor context, including its mask/feedback/presentation passes; all three Butterchurn contexts are excluded. No `gl.finish` or `readPixels` is used. An unavailable GPU timer remains explicitly unavailable. Use the running, unpaused page after warmup for a meaningful measurement; a paused page's RAF rate is not an active-rendering performance claim.
 
 Build/type validation passed for the performance code. Browser timing remains unverified in this assignment because the available browser-control connection could not navigate; the HUD is provided for measurement in the user's Chrome session. No 60 fps or hardware-GPU result is claimed without that runtime evidence.
+
+## Portfolio deployment
+
+`npm run build:museum` builds only the museum into `dist-museum/`, promotes its HTML to the artifact root, bundles its font with `/web/` asset URLs, and retains `credits.txt`. No band homepage or band asset collection is included. The destination-specific `museum-pages.yml` workflow publishes this artifact from `codex/tree-museum-coordinator` to GitHub Pages in `satoramoto/web`. The source repository and Pages website are public. The original band deployment is restricted to its original repository. This fast POC workflow runs the production/type build without automated tests, as requested.
