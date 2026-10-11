@@ -6,13 +6,9 @@ import type { MuseumPerformance } from './performance';
 import { themes, initialTheme, type ThemeId } from './themes';
 import { PresetBrowser } from './PresetBrowser';
 import { initialPreset, loadLibraryPreset, presetCatalogue } from './preset-library';
+import { chapters, projects, journeyLength, viewportLength, wrapJourney } from './journey';
 import './museum.css';
 
-const projects = [
-  {id:'flow', title:'museum.flow.title', description:'museum.flow.description', medium:'museum.flow.medium', href:'https://github.com/openflowfm/visuals', link:'museum.repository'},
-  {id:'blackhole', title:'museum.blackhole.title', description:'museum.blackhole.description', medium:'museum.blackhole.medium', href:'https://github.com/ryangavin/blackhole-visualizer', link:'museum.repository'},
-  {id:'astronaut', title:'museum.astronaut.title', description:'museum.astronaut.description', medium:'museum.astronaut.medium', href:'https://funkadelicastronaut.com', link:'museum.visit'},
-] as const;
 
 function TreeMuseum() {
   const perfEnabled=new URLSearchParams(location.search).get('perf')==='1';
@@ -21,6 +17,7 @@ function TreeMuseum() {
   const [presetId,setPresetId]=useState<string|null>(null);
   const [pickerOpen,setPickerOpen]=useState(false),[presetLoading,setPresetLoading]=useState(false),[presetError,setPresetError]=useState(false);
   const [retryPresetId,setRetryPresetId]=useState<string|null>(null);
+  const requestedPreset=useRef<string|null>(null);
   const selectionRequest=useRef(0),selectionAbort=useRef<AbortController|null>(null);
   const themeButtons=useRef<(HTMLButtonElement|null)[]>([]);
   const [perf,setPerf]=useState<MuseumPerformance|null>(null);
@@ -36,7 +33,7 @@ function TreeMuseum() {
   const activeRef = useRef(active); activeRef.current=active;
   const pickerRef=useRef(false);pickerRef.current=pickerOpen;
   async function selectLibrary(id:string) {
-    const candidate=presetCatalogue.find(preset=>preset.id===id);if(!candidate)return;
+    const candidate=presetCatalogue.find(preset=>preset.id===id);if(!candidate)return;requestedPreset.current=id;
     const request=++selectionRequest.current;selectionAbort.current?.abort();const controller=new AbortController();selectionAbort.current=controller;
     setPresetLoading(true);setPresetError(false);setRetryPresetId(id);
     try{const preset=await loadLibraryPreset(id,controller.signal);if(request!==selectionRequest.current||!renderer.current)return;
@@ -48,25 +45,30 @@ function TreeMuseum() {
     finally{if(request===selectionRequest.current)setPresetLoading(false);}
   }
   function chooseTheme(value:ThemeId){
-    selectionRequest.current++;selectionAbort.current?.abort();setPresetId(null);setPresetLoading(false);setPresetError(false);setError(false);renderer.current?.setTheme(value);setTheme(value);
+    requestedPreset.current=null;selectionRequest.current++;selectionAbort.current?.abort();setPresetId(null);setPresetLoading(false);setPresetError(false);setError(false);renderer.current?.setTheme(value);setTheme(value);
     const url=new URL(location.href);url.searchParams.delete('preset');url.searchParams.set('theme',value);history.replaceState(null,'',url);try{localStorage.removeItem('treeMuseum.preset');}catch{/* Storage may be disabled. */}
   }
   useEffect(()=> {
     document.title=t('museum.documentTitle');
-    let labelsFrame=0, previousPosition=-1;
+    let labelsFrame=0;
     const perfTimer=perfEnabled?window.setInterval(()=>setPerf(window.__treeMuseum?.performance||null),1000):0;
     try { renderer.current=createMuseumRenderer(canvas.current!,()=>setError(true),theme); }
     catch { setError(true); }
     if(startingPreset.current)void selectLibrary(startingPreset.current);
     const updateLabels = () => {
       const position=renderer.current?.position || 0;
-      if(Math.abs(position-previousPosition)>1e-7) labels.current.forEach((label,index)=>{
+      labels.current.forEach((label,index)=>{
         if (!label) return;
-        const y=((1+index*2-position)%6+6)%6;
-        label.style.top=`${y/6*100}%`;
-        label.style.opacity=String(Math.min(1,y*3,(6-y)*3));
+        const y=wrapJourney(projects[index].worldY-position);
+        const visible=y>.65&&y<viewportLength-.55;
+        label.hidden=!visible; label.tabIndex=visible?0:-1;
+        label.style.top=`${y/viewportLength*100}%`;
+        label.style.opacity=String(Math.min(1,(y-.65)*3,(viewportLength-.55-y)*3));
       });
-      previousPosition=position;
+      document.querySelectorAll<HTMLElement>('.museum-chapter').forEach((label,index)=>{
+        const y=wrapJourney(chapters[index].worldY-position);label.hidden=y>.65+viewportLength;
+        label.style.top=`${y/viewportLength*100}%`;
+      });
       labelsFrame=requestAnimationFrame(updateLabels);
     };
     updateLabels();
@@ -87,6 +89,11 @@ function TreeMuseum() {
       if(activeRef.current!==null||pickerRef.current) return;
       const target=event.target;
       if(target instanceof HTMLElement&&target.closest('input,textarea,select,[contenteditable]'))return;
+      if(event.key==='['||event.key===']'||event.key.toLowerCase()==='r') {
+        event.preventDefault();const index=presetCatalogue.findIndex(preset=>preset.id===requestedPreset.current);
+        const next=event.key.toLowerCase()==='r'?Math.floor(Math.random()*presetCatalogue.length):(Math.max(0,index)+(event.key==='['?-1:1)+presetCatalogue.length)%presetCatalogue.length;
+        void selectLibrary(presetCatalogue[next].id);return;
+      }
       if(event.key===' ' && target instanceof HTMLElement && target.closest('button,a')) return;
       const deltas:Record<string,number>={ArrowDown:.35,ArrowUp:-.35,PageDown:2,PageUp:-2,' ':event.shiftKey?-2:2};
       if(event.key in deltas) {event.preventDefault();move(deltas[event.key]);}
@@ -138,10 +145,14 @@ function TreeMuseum() {
         if(next<0) return;event.preventDefault();event.stopPropagation();chooseTheme(themes[next].id);themeButtons.current[next]?.focus();
       }}>{t(item.label)}</button>)}
     </div>
-    <PresetBrowser retryId={retryPresetId} selected={presetId||presetCatalogue.find(preset=>preset.name===themes.find(item=>item.id===theme)!.name)?.id||null} name={presetCatalogue.find(preset=>preset.id===presetId)?.name||themes.find(item=>item.id===theme)!.name} loading={presetLoading} error={presetError} onSelect={id=>{void selectLibrary(id);}} onOpen={setPickerOpen} />
+    <PresetBrowser retryId={retryPresetId} selected={retryPresetId||presetId||presetCatalogue.find(preset=>preset.name===themes.find(item=>item.id===theme)!.name)?.id||null} name={presetCatalogue.find(preset=>preset.id===presetId)?.name||themes.find(item=>item.id===theme)!.name} loading={presetLoading} error={presetError} onSelect={id=>{void selectLibrary(id);}} onOpen={setPickerOpen} />
+    <nav className="museum-chapter-nav" aria-label={t('museum.journey.chapters')}>
+      {chapters.map(chapter=><button key={chapter.owner} onClick={()=>{renderer.current?.move(wrapJourney(chapter.worldY-1.4-(renderer.current?.position||0)));setExplored(true);}}>{chapter.owner}<small>{chapter.count}</small></button>)}
+    </nav>
     <nav className="museum-projects" aria-label={t('museum.projects')}>
-      {projects.map((project,index)=><button className={`museum-project museum-project-${index}`} key={project.id} ref={element=>{labels.current[index]=element;}} type="button" style={{top:`${(1+index*2)/6*100}%`}} onClick={()=>setActive(index)} aria-haspopup="dialog">
-        <span className="museum-project-name">{t(project.title)}</span><span className="museum-leader" aria-hidden="true"><i /></span>
+      {chapters.map((chapter,index)=><div className="museum-chapter" key={chapter.owner} hidden><small>{String(index+1).padStart(2,'0')} / {t('museum.journey.public',{count:String(chapter.count)})}</small><h2>{chapter.owner}</h2></div>)}
+      {projects.map((project,index)=><button className={`museum-project museum-project-${project.side<0?'left':'right'}`} key={project.url} ref={element=>{labels.current[index]=element;}} type="button" hidden onClick={()=>setActive(index)} aria-haspopup="dialog">
+        <span className="museum-project-number">{String(index+1).padStart(2,'0')}</span><span className="museum-project-name">{project.name}</span>
       </button>)}
     </nav>
     <div className={`museum-scroll-cue${explored?' museum-scroll-cue-used':''}`}><span>{t('museum.scroll')}</span><span aria-hidden="true">↓</span></div>
@@ -149,10 +160,10 @@ function TreeMuseum() {
     <dialog className="museum-dialog" ref={dialog} aria-labelledby="project-title" onCancel={event=>{event.preventDefault();close();}} onClick={event=>{if(event.target===event.currentTarget) close();}}>
       {selected && <article className="museum-detail">
         <button className="museum-close" type="button" onClick={close} aria-label={t('museum.close')} autoFocus><span aria-hidden="true">×</span></button>
-        <p className="museum-detail-number">{String(active!+1).padStart(2,'0')} <span> / </span> {t(selected.medium)}</p>
-        <h1 id="project-title">{t(selected.title)}</h1>
-        <p className="museum-detail-description">{t(selected.description)}</p>
-        <a href={selected.href} target="_blank" rel="noopener noreferrer">{t(selected.link)}<span aria-hidden="true">↗</span></a>
+        <p className="museum-detail-number">{String(active!+1).padStart(2,'0')} <span> / </span> {selected.owner} · {selected.language||t('museum.journey.repository')} {selected.fork&&<> · {t('museum.journey.fork')}</>} {selected.archived&&<> · {t('museum.journey.archived')}</>}</p>
+        <h1 id="project-title">{selected.name}</h1>
+        <p className="museum-detail-description">{selected.description||t('museum.journey.noDescription')}</p>
+        <a href={selected.url} target="_blank" rel="noopener noreferrer">{t('museum.repository')}<span aria-hidden="true">↗</span></a>
         <div className="museum-detail-footer">{t('museum.returnHint')}</div>
       </article>}
     </dialog>

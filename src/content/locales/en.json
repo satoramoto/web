@@ -155,7 +155,17 @@
       "results": "Showing {{shown}} of {{count}} presets",
       "more": "Show more",
       "retry": "Retry selection",
-      "close": "Close preset library"
+      "close": "Close preset library",
+      "quick": "Quick preset browsing",
+      "shortcuts": "[ previous · ] next · R random"
+    },
+    "journey": {
+      "chapters": "Repository chapters",
+      "public": "{count} public repositories",
+      "repository": "Repository",
+      "fork": "Fork",
+      "archived": "Archived",
+      "noDescription": "No description provided on GitHub."
     }
   }
 }
