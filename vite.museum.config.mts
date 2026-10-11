@@ -12,6 +12,7 @@ export default defineConfig({
       const html = readFileSync(resolve(output, 'museum/index.html'), 'utf8');
       writeFileSync(resolve(output, 'index.html'), html.replaceAll('../assets/', './assets/'));
       copyFileSync(resolve('public/museum/credits.txt'), resolve(output, 'credits.txt'));
+      copyFileSync(resolve('assets/fonts/archivo/OFL.txt'), resolve(output, 'assets/Archivo-OFL.txt'));
       writeFileSync(resolve(output, '.nojekyll'), '');
       rmSync(resolve(output, 'museum'), { recursive: true });
     },
