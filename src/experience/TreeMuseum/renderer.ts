@@ -116,6 +116,8 @@ void main() {
     coordinate=vec2(angle/PI*2.+clock*.16,-log(abs(dx)+.10)*.65-clock*.23+signedWave*.36);
     coordinate+=vec2(.06*sin(y*PI),.08*cos(y*2.*PI/3.));
   }
+  // Quarter-turn the live source in the spine-local frame: long crests follow y, not outward x.
+  coordinate=.5+vec2(.5-coordinate.y,coordinate.x-.5);
   vec3 probe0=sampleLayer(0,coordinate);
   vec3 probe1=sampleLayer(1,coordinate+vec2(.13,.17));
   vec3 probe2=sampleLayer(2,coordinate-vec2(.11,.19));
@@ -146,10 +148,14 @@ void main() {
   // Backtrace away from the same signed sample position. Old emission travels out into quiet space.
   float side=dx/sqrt(dx*dx+.003);
   float outward=theme==2?2.2:theme==0?1.65:1.1;
-  float envelopeSlope=(signalAt(y+.035,0.).b-signalAt(y-.035,0.).b)/.07;
-  vec2 velocity=vec2(side*outward/worldWidth(),.035-clamp(envelopeSlope,-3.,3.)*.12+signedWave*(theme==1?.16:.09));
-  velocity+=flow*(theme==1?.45:.18);
-  if(theme==0) velocity.y+=side*.09*sin(y*PI);
+  // A broad secant follows the curved line without turning individual carrier wiggles into jets.
+  vec4 above=signalAt(y+.24,0.), below=signalAt(y-.24,0.);
+  float slope=clamp((spineAt(y+.24,above)-spineAt(y-.24,below))/.48,-.7,.7);
+  vec2 normal=normalize(vec2(1.,-slope));
+  vec2 tangent=vec2(-normal.y,normal.x);
+  vec2 worldVelocity=normal*(side*outward)+tangent*(.06+signedWave*.08);
+  vec2 velocity=worldVelocity/vec2(worldWidth(),6.);
+  velocity+=(normal*flow.x+tangent*flow.y)*(theme==1?.18:.09);
   vec2 advected=vec2(clamp(uv.x-velocity.x*feedbackDelta,0.,1.),fract(uv.y-velocity.y*feedbackDelta));
   vec3 previous=texture(sharedField,advected).rgb;
   float retention=exp(-feedbackDelta*(theme==1?.85:1.15));
@@ -164,7 +170,20 @@ void main() {
   float y=mod((1.-uv.y)*6.+position,6.);
   float x=(uv.x-.5)*worldWidth();
   float stem=trunk(y);
-  vec3 result=texture(sharedField,vec2(uv.x,y/6.)).rgb+vec3(.001,.002,.006);
+  // Transported preset RGB is presented as advancing curved phase fronts, not continuous sideways bars.
+  vec4 centerSignal=signalAt(y,0.);
+  float broadSpine=spineAt(y,centerSignal)*.5+spineAt(y+.20,signalAt(y+.20,0.))*.25+spineAt(y-.20,signalAt(y-.20,0.))*.25;
+  float outward=theme==2?2.2:theme==0?1.65:1.1;
+  float distance=abs(x-broadSpine);
+  float phase=distance*17.-clock*outward*17.+.5*sin(y*PI/3.+clock*.17);
+  float front=pow(.5+.5*cos(phase),2.4);
+  float nearEmitter=exp(-pow(x-spineAt(y,centerSignal),2.)*90.);
+  float crest=max(.10+front*.90,nearEmitter*.9);
+  // Short integration along the crest joins thin source scanlines without blurring across its normal.
+  vec3 wake=texture(sharedField,vec2(uv.x,y/6.)).rgb*.5;
+  wake+=texture(sharedField,vec2(uv.x,fract((y+.09)/6.))).rgb*.25;
+  wake+=texture(sharedField,vec2(uv.x,fract((y-.09)/6.))).rgb*.25;
+  vec3 result=wake*crest+vec3(.001,.002,.006);
   // A sparse contour gives the tree structure without the old repeated fan of eighteen rails per layer.
   vec2 limbs=texture(branchMask,vec2(uv.x,y/6.)).rg;
   result+=paletteAt(y)*limbs.y*.035;
