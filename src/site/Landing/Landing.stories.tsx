@@ -1,11 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Landing } from './Landing';
 
-const meta = { title: 'Site/Satoramoto', component: Landing, parameters: { layout: 'fullscreen' } } satisfies Meta<typeof Landing>;
+const meta = {
+  title: 'Site/Satoramoto',
+  component: Landing,
+  args: { variant: 'observatory', palette: 'silver-gold' },
+  parameters: { layout: 'fullscreen' },
+} satisfies Meta<typeof Landing>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-const observatory = { variant: 'observatory', palette: 'silver-gold' } as const;
 
-export const Mirrored: Story = { args: { ...observatory, labels: 'bare-text' } };
-export const ContactRows: Story = { args: { ...observatory, labels: 'hairline-edge' } };
-export const QuietPill: Story = { args: { ...observatory, labels: 'quiet-pill' } };
+export const Junction: Story = { args: { labels: 'junction' } };
+export const Marginalia: Story = { args: { labels: 'marginalia' } };
+export const Keybed: Story = { args: { labels: 'keybed' } };
+export const ContactRows: Story = { args: { labels: 'hairline-edge' } };
+export const QuietPill: Story = { args: { labels: 'quiet-pill' } };

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { t } from '../../i18n/copy';
+import { ContactPaths, type ContactTreatment } from './ContactPaths';
 import './landing.css';
 
 const fragment = `
@@ -122,21 +123,19 @@ function Field({ variant, palette }: { variant: string; palette: keyof typeof pa
   return <canvas className="opal-field" ref={ref} aria-hidden="true" />;
 }
 
-function PathLabel({ text }: { text: string }) {
-  return <span className="opal-path-label">{text}</span>;
-}
+type LandingProps = {
+  variant?: 'interference' | 'observatory' | 'standing';
+  palette?: keyof typeof palettes;
+  labels?: ContactTreatment;
+};
 
-
-export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original' }: { variant?: 'interference' | 'observatory' | 'standing'; palette?: keyof typeof palettes; labels?: 'original' | 'bare-text' | 'hairline-edge' | 'quiet-pill' }) {
-  return <main className={`opal opal--${variant} opal-palette--${palette} opal-labels--${labels}${labels === 'original' ? '' : ' opal-contact-study'}`}>
+export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original' }: LandingProps) {
+  return <main className={`opal opal--${variant} opal-palette--${palette}`}>
     <Field variant={variant} palette={palette} />
     <section className="opal-intro">
       <h1>{t('landing.brand')}</h1>
       <p className="opal-tagline">{t('landing.description')}</p>
-      <nav className="opal-paths" aria-label={t('landing.contact')}>
-      <a href="mailto:hello@satoramoto.com?subject=I%20need%20compute"><PathLabel text={t('landing.visionary')} /><strong>{t('landing.need')} <i aria-hidden="true">↗</i></strong></a>
-      <a href="mailto:hello@satoramoto.com?subject=I%20have%20compute"><PathLabel text={t('landing.accelerator')} /><strong>{t('landing.have')} <i aria-hidden="true">↗</i></strong></a>
-      </nav>
+      <ContactPaths treatment={labels} />
     </section>
   </main>;
 }
