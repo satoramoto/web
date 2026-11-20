@@ -7,5 +7,22 @@
     "accelerator": "Accelerator",
     "need": "Need compute?",
     "have": "Have compute?"
+  },
+  "junction": {
+    "question": {
+      "visionary": "Are you a <strong>visionary</strong> <span>building something revolutionary?</span>",
+      "accelerator": "Are you an <strong>accelerator</strong> <span>looking to change the world?</span>"
+    },
+    "message": {
+      "visionary": "What are you building?",
+      "accelerator": "What do you have to offer?"
+    },
+    "email": "Your email",
+    "change": "Change path",
+    "draft": "Open email draft",
+    "recipient": "hello@satoramoto.com",
+    "emptyMessage": "Write a message to include in your draft.",
+    "subject": "{{role}} inquiry to satoramoto",
+    "body": "{{role}}\r\nReply to: {{email}}\r\n\r\n{{message}}"
   }
 }

@@ -32,31 +32,6 @@
 }
 .contact--quiet-pill a:hover strong { border-color: currentColor; background: #24272e; }
 
-/* Junction: the clickable branches share a die, but not a hit target. */
-.contact--junction {
-  display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr);
-  grid-template-rows: repeat(2, 3rem);
-  width: min(100%, 23rem);
-}
-.junction-die { grid-row: span 2; align-self: center; width: 100%; height: 3rem; }
-.die-pin { stroke: #7f8999; }
-.contact--junction:has([data-role="visionary"]:is(:hover, :focus-visible)) .die-pin--upper { stroke: var(--blue); }
-.contact--junction:has([data-role="accelerator"]:is(:hover, :focus-visible)) .die-pin--lower { stroke: var(--red); }
-.contact--junction a { display: grid; grid-template-columns: clamp(2.5rem, 6vw, 4rem) 1fr; align-items: center; }
-.junction-route { width: 100%; height: 100%; stroke: #818a9a; }
-.junction-route :is(path, circle) { vector-effect: non-scaling-stroke; stroke-width: 1.25; }
-.junction-route circle { stroke: currentColor; fill: #08090b; }
-.junction-end { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; padding-left: .6rem; text-align: left; }
-.junction-end strong { text-decoration: underline; text-decoration-color: #f2f3f550; text-underline-offset: .22em; }
-.contact--junction a:is(:hover, :focus-visible) .junction-route { stroke: currentColor; }
-.contact--junction a:is(:hover, :focus-visible) circle { fill: currentColor; }
-.contact--junction a:is(:hover, :focus-visible) strong { text-decoration-color: currentColor; }
-@media (max-width: 27rem) {
-  .contact--junction { width: fit-content; max-width: 100%; grid-template-columns: 3.5rem auto; }
-  .junction-end { flex-direction: column; gap: .08rem; }
-}
-
 /* Marginalia: a diagonal of single-line links with raised role notes. */
 .contact--marginalia { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35rem; width: min(100%, 31rem); }
 .contact--marginalia a { display: flex; align-items: center; justify-self: start; min-height: 2.875rem; }
