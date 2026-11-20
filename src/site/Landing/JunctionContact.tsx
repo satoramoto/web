@@ -30,8 +30,9 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
   const messagePrompt = t(`junction.message.${role}`);
 
   useLayoutEffect(() => {
+    if (reply) emailRef.current?.focus({ preventScroll: true });
     if (sent) receiptRef.current?.focus({ preventScroll: true });
-  }, [sent]);
+  }, [reply, sent]);
 
   // Lay out the new panel once. Move the centered hero from its old position
   // on the compositor rather than relaying out the form on every frame.
@@ -63,8 +64,7 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
       const timer = window.setTimeout(() => setStep('reply'), 380);
       return () => window.clearTimeout(timer);
     }
-    if (step === 'reply') emailRef.current?.focus({ preventScroll: true });
-    else if (returning.current) {
+    if (step === 'choose' && returning.current) {
       choicesRef.current?.querySelector<HTMLButtonElement>(`[data-role="${role}"]`)?.focus({ preventScroll: true });
       returning.current = false;
     }
@@ -110,7 +110,7 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
     }
   }
 
-  return <div className="junction-console" data-step={step} data-selected={role} ref={consoleRef}>
+  return <div className="junction-console" data-step={step} data-selected={role} data-scene={step === 'choose' ? 'observatory' : role} ref={consoleRef}>
     <div className="junction-panel" data-open={!reply && !sent} inert={reply || sent} aria-hidden={reply || sent}>
       <div className="junction-clip">
         <div className="junction-choices" ref={choicesRef} role="group" aria-label={t('junction.choose')}>
@@ -124,7 +124,7 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
     </div>
     <div className="junction-panel" data-open={reply} inert={!reply} aria-hidden={!reply}>
       <div className="junction-clip">
-        <form id={formId} className="junction-form" data-status={status} aria-labelledby={`${formId}-role`} onSubmit={compose}>
+        <form id={formId} className="junction-form" data-status={status} aria-label={t(`landing.${role}`)} onSubmit={compose}>
           <input ref={emailRef} name="email" type="email" autoComplete="email" aria-label={emailPrompt} placeholder={emailPrompt}
             value={email} maxLength={254} required readOnly={sending} onChange={event => setEmail(event.target.value)} />
           <textarea ref={messageRef} name="message" rows={3} aria-label={messagePrompt} placeholder={messagePrompt}
@@ -137,9 +137,15 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
           {!sendContact && <p className="junction-address">{inbox}</p>}
           <footer>
             <div className="junction-path">
-              <h2 id={`${formId}-role`}>{t(`landing.${role}`)}</h2>
-              <span aria-hidden="true">·</span>
-              <button type="button" className="junction-back" disabled={sending} onClick={returnToChoices}>{t('junction.change')}</button>
+              <select aria-label={t('junction.choose')} value={role} disabled={sending} onChange={event => {
+                const next = event.target.value as JunctionRole;
+                messageRef.current?.setCustomValidity('');
+                setStatus('ready');
+                setRole(next);
+                onRoute(next, event.target.getBoundingClientRect());
+              }}>
+                {roles.map(who => <option key={who} value={who}>{t(`landing.${who}`)}</option>)}
+              </select>
             </div>
             <button type="submit" className="junction-send" ref={sendRef} aria-disabled={sending || undefined}>
               <span>{t(sendContact ? 'junction.send' : 'junction.draft')}</span><span className="junction-send-mark" aria-hidden="true" />

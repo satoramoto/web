@@ -47,21 +47,48 @@ export const WritingSurface: Story = {
     const { canvas } = context;
     const find = (role: string, name: string) => canvas.getByRole(role, { name });
     const edge = (role: string, name: string) => find(role, name).getBoundingClientRect();
-    const middle = (rect: DOMRect) => rect.top + rect.height / 2;
+    const center = (rect: DOMRect) => rect.left + rect.width / 2;
     const emailField = edge('textbox', 'your email');
     const messageField = edge('textbox', 'what are you building?');
-    const path = edge('button', 'change path');
+    const path = edge('combobox', 'choose a contact path');
     const action = edge('button', send);
     await expect(find('textbox', 'your email')).toHaveAttribute('placeholder', 'your email');
     await expect(find('textbox', 'what are you building?')).toHaveAttribute('placeholder', 'what are you building?');
     await expect(emailField.left).toBeCloseTo(messageField.left);
-    await expect(edge('heading', 'visionary').left).toBeCloseTo(messageField.left);
+    await expect(path.left).toBeCloseTo(messageField.left);
     await expect(emailField.right).toBeCloseTo(messageField.right);
-    await expect(path.right).toBeLessThan(action.left);
-    await expect(middle(path)).toBeCloseTo(middle(action));
-    await expect(action.right).toBeCloseTo(messageField.right);
+    await expect(center(action)).toBeCloseTo(center(messageField));
   },
 };
+
+const acceleratorDraft = 'I can make some compute available.';
+const pathName = 'choose a contact path';
+const acceleratorPrompt = 'what do you have to offer?';
+
+export const SwitchPaths: Story = scenario({
+  requirement: 'Contact paths',
+  shall: 'The Junction SHALL distinguish the active contact path with its own scene and keep each role’s draft when the visitor changes paths.',
+  given: 'a visitor has a visionary and an accelerator draft',
+  when: 'they select accelerator from the visionary form',
+  then: 'the gold scene opens on their accelerator draft without leaving the form',
+  act: ({ canvas, userEvent }) => userEvent.selectOptions(canvas.getByRole('combobox', { name: pathName }), 'accelerator'),
+  check: async ({ canvas }) => {
+    const form = canvas.getByRole('form', { name: 'accelerator' });
+    await expect(form.closest('.junction-console')).toHaveAttribute('data-scene', 'accelerator');
+    await expect(canvas.getByRole('textbox', { name: acceleratorPrompt })).toHaveValue(acceleratorDraft);
+    await expect(canvas.getByRole('textbox', { name: 'your email' })).toHaveValue(email);
+  },
+}, {
+  args: { sendContact: accepted },
+  play: async context => {
+    await writeMessage(context);
+    const { canvas, userEvent } = context;
+    const path = canvas.getByRole('combobox', { name: pathName });
+    await userEvent.selectOptions(path, 'accelerator');
+    await userEvent.type(canvas.getByRole('textbox', { name: acceleratorPrompt }), acceleratorDraft);
+    await userEvent.selectOptions(path, 'visionary');
+  },
+});
 
 export const SignalReceived: Story = scenario({
   given: 'a visionary has written a message',
@@ -97,6 +124,7 @@ export const Sending: Story = scenario({
   check: async ({ canvas }) => {
     await expect(canvas.getByRole('status')).toHaveTextContent('sending…');
     await expect(canvas.getByRole('button', { name: send })).toHaveAttribute('aria-disabled', 'true');
+    await expect(canvas.getByRole('combobox', { name: pathName })).toBeDisabled();
     await expect(canvas.queryByRole('heading', { name: 'thank you. signal received.' })).not.toBeInTheDocument();
   },
 }, { args: { sendContact: () => new Promise<void>(() => {}) }, play: writeMessage });
