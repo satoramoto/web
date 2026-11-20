@@ -19,4 +19,6 @@ Junction keeps the email and each role’s message in memory while the visitor c
 
 GitHub Pages deploys on every push to the default branch of `satoramoto/web`, including pull request merges. To redeploy the same branch manually, use **Actions → Deploy website to GitHub Pages → Run workflow**. Other branches do not publish the site.
 
+Junction submits on `satoramoto.com` through the separate Cloudflare Worker `satoramoto-contact` at `contact.satoramoto.com`. The Worker runs `worker/contact.mjs` with `CONTACT_EMAIL` (restricted to the verified inbox behind `hello@satoramoto.com`), `CONTACT_TO`, `TURNSTILE_SECRET`, and `CONTACT_RATE` bindings. Its `junction_contact` Turnstile widget is restricted to `satoramoto.com`. Keep the destination and secret in Cloudflare, not in the site build; the public widget key is in `src/site/main.tsx`. Run `npm run test:contact` before deploying Worker changes. The Storybook send states simulate mail and never contact the inbox.
+
 The former band site lives in [ryangavin/funkadelic-astronaut-web](https://github.com/ryangavin/funkadelic-astronaut-web).

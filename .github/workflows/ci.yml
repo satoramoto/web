@@ -26,6 +26,8 @@ jobs:
         run: npm ci
       - name: Build site (npm run build)
         run: npm run build
+      - name: Test contact Worker
+        run: npm run test:contact
 
   storybook-build:
     name: Storybook build

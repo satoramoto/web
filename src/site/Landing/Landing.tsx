@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { t } from '../../i18n/copy';
 import { ContactPaths, type ContactTreatment } from './ContactPaths';
-import { JunctionContact, type RouteSignal } from './JunctionContact';
+import { JunctionContact, type RouteSignal, type SendContact } from './JunctionContact';
 import './landing.css';
 
 const fragment = `
@@ -200,9 +200,10 @@ type LandingProps = {
   variant?: 'interference' | 'observatory' | 'standing';
   palette?: keyof typeof palettes;
   labels?: ContactTreatment;
+  sendContact?: SendContact;
 };
 
-export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original' }: LandingProps) {
+export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original', sendContact }: LandingProps) {
   const signal = useRef<RouteSignal | null>(null);
   return <main className={`opal opal--${variant} opal-palette--${palette}`}>
     <Field variant={variant} palette={palette} signal={signal} />
@@ -210,7 +211,7 @@ export function Landing({ variant = 'interference', palette = variant === 'inter
       <h1>{t('landing.brand')}</h1>
       <p className="opal-tagline">{t('landing.description')}</p>
       {labels === 'junction'
-        ? <JunctionContact onRoute={(role, origin) => signal.current?.(role, origin) ?? false} />
+        ? <JunctionContact onRoute={(role, origin) => signal.current?.(role, origin) ?? false} sendContact={sendContact} />
         : <ContactPaths treatment={labels} />}
     </section>
   </main>;

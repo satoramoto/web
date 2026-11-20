@@ -8,7 +8,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test:stories": "vitest --project=storybook --run"
+    "test:stories": "vitest --project=storybook --run",
+    "test:contact": "node --test worker/contact.test.mjs"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.3.1",
@@ -24,6 +25,7 @@
     "@vitest/browser-playwright": "^4.1.11",
     "@vitest/coverage-v8": "^4.1.11",
     "playwright": "^1.63.0",
+    "story-spec": "https://github.com/satoramoto/story-spec/archive/cbfaa1b6d1b5dcb80ae0d03184d46241d96f8a76.tar.gz",
     "storybook": "^10.6.0",
     "typescript": "^7.0.2",
     "vite": "8.2.2",
