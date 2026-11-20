@@ -1,9 +1,8 @@
 {
   "landing": {
-    "brand": "Satoramoto",
-    "platform": "Independent infrastructure",
-    "headline": "Compute without gatekeepers.",
-    "description": "Satoramoto is building a better way to access compute, large language models, and developer tools. We’re starting with affordable GPU capacity and building toward confidential computing for work you can’t share with your provider.",
+    "brand": "satoramoto",
+    "contact": "Get in touch",
+    "description": "expanding access to infrastructure, inference, and developer tooling.",
     "visionary": "Visionary",
     "accelerator": "Accelerator",
     "need": "Need compute?",

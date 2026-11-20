@@ -5,6 +5,7 @@ import './landing.css';
 const fragment = `
 precision mediump float;
 uniform vec2 size, mouse, origin;
+uniform vec3 cool, warm;
 uniform float time, age, mode;
 void main(){
   vec2 p=(gl_FragCoord.xy-size*.5)/size.y;
@@ -16,19 +17,42 @@ void main(){
   float bend=.08*sin(x*5.+time*.45)+.045*sin(x*11.-time*.23)+.065*pulse;
   if(mode<1.5) bend+=.13*pointer*mouse.y;
   vec3 color=vec3(0.);
+  float coverage=0.;
   for(int i=0;i<18;i++){
     float n=float(i)/17.;
     float y=bend+(.08+n*.17)*sin(4.*x+n*3.-time*.35)+(n-.5)*.23;
     float z=-bend+(.08+n*.17)*sin(4.*x-n*3.+time*.3)+(n-.5)*.23;
-    vec3 blue=mix(vec3(.19,.39,1.),vec3(.12,.86,.79),step(.5,mode));
-    vec3 red=mix(vec3(1.,.18,.16),vec3(1.,.47,.22),step(.5,mode));
-    color+=blue*.12*exp(-abs(p.y-y)*200.)*smoothstep(-.85,.35,x);
-    color+=red*.12*exp(-abs(p.y-z)*200.)*(1.-smoothstep(-.35,.85,x));
+    float frontCool=exp(-abs(p.y-y)*200.)*smoothstep(-.85,.35,x);
+    float frontWarm=exp(-abs(p.y-z)*200.)*(1.-smoothstep(-.35,.85,x));
+    color+=.12*(cool*frontCool+warm*frontWarm);
+    coverage=max(coverage,max(frontCool,frontWarm));
   }
-  gl_FragColor=vec4(color*exp(-1.7*abs(x)),1.);
+  color*=exp(-1.7*abs(x));
+  if(mode>.5 && mode<1.5){
+    // Keep the center calm for the wordmark and contact links.
+    float outsideCopy=smoothstep(.22,.62,abs(x));
+    color*=mix(1.08,1.55,outsideCopy);
+    // Defocused echoes share the wave displacement, but lag and respond less.
+    float lag=.045*sin(x*5.+time*.45-.8)+.024*sin(x*11.-time*.23+.6);
+    lag+=.019*pulse+.028*pointer*mouse.y;
+    float a=p.y-.28-lag-.08*sin(3.*x-time*.16);
+    float b=p.y+.27+lag+.07*sin(3.5*x+time*.14);
+    float echoA=exp(-125.*a*a)*exp(-2.5*(x-.36)*(x-.36));
+    float echoB=exp(-100.*b*b)*exp(-2.5*(x+.36)*(x+.36));
+    vec3 rear=.14*(cool*echoA+warm*echoB);
+    color+=rear*(1.-smoothstep(.02,.5,coverage));
+  }
+  gl_FragColor=vec4(color,1.);
 }`;
 
-function Field({ variant }: { variant: string }) {
+const palettes = {
+  'teal-copper': [[.12,.86,.79], [1,.47,.22]],
+  'blue-red': [[.19,.39,1], [1,.18,.16]],
+  'ice-violet': [[.32,.78,1], [.68,.32,1]],
+  'silver-gold': [[.17,.43,1], [1,.62,.12]],
+} as const;
+
+function Field({ variant, palette }: { variant: string; palette: keyof typeof palettes }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current!;
@@ -78,6 +102,9 @@ function Field({ variant }: { variant: string }) {
       gl.enableVertexAttribArray(vertex);
       gl.vertexAttribPointer(vertex, 2, gl.FLOAT, false, 0, 0);
       gl.uniform1f(uniforms.mode, variant === 'interference' ? 0 : variant === 'observatory' ? 1 : 2);
+      const [cool, warm] = palettes[palette];
+      gl.uniform3f(gl.getUniformLocation(program, 'cool'), cool[0], cool[1], cool[2]);
+      gl.uniform3f(gl.getUniformLocation(program, 'warm'), warm[0], warm[1], warm[2]);
       stage.addEventListener('pointermove', move);
       stage.addEventListener('pointerdown', tap);
       motion.addEventListener('change', update);
@@ -91,21 +118,25 @@ function Field({ variant }: { variant: string }) {
       gl.deleteProgram(program); gl.deleteBuffer(buffer);
       for (const shader of shaders) gl.deleteShader(shader);
     };
-  }, [variant]);
+  }, [variant, palette]);
   return <canvas className="opal-field" ref={ref} aria-hidden="true" />;
 }
 
-export function Landing({ variant = 'interference' }: { variant?: 'interference' | 'observatory' | 'standing' }) {
-  return <main className={`opal opal--${variant}`}>
-    <Field variant={variant} />
-    <header className="opal-masthead"><span>{t('landing.brand')}</span><span>{t('landing.platform')}</span></header>
+function PathLabel({ text }: { text: string }) {
+  return <span className="opal-path-label">{text}</span>;
+}
+
+
+export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original' }: { variant?: 'interference' | 'observatory' | 'standing'; palette?: keyof typeof palettes; labels?: 'original' | 'bare-text' | 'hairline-edge' | 'quiet-pill' }) {
+  return <main className={`opal opal--${variant} opal-palette--${palette} opal-labels--${labels}${labels === 'original' ? '' : ' opal-contact-study'}`}>
+    <Field variant={variant} palette={palette} />
     <section className="opal-intro">
-      <h1>{t('landing.headline')}</h1>
-      <p>{t('landing.description')}</p>
+      <h1>{t('landing.brand')}</h1>
+      <p className="opal-tagline">{t('landing.description')}</p>
+      <nav className="opal-paths" aria-label={t('landing.contact')}>
+      <a href="mailto:hello@satoramoto.com?subject=I%20need%20compute"><PathLabel text={t('landing.visionary')} /><strong>{t('landing.need')} <i aria-hidden="true">↗</i></strong></a>
+      <a href="mailto:hello@satoramoto.com?subject=I%20have%20compute"><PathLabel text={t('landing.accelerator')} /><strong>{t('landing.have')} <i aria-hidden="true">↗</i></strong></a>
+      </nav>
     </section>
-    <footer className="opal-paths">
-      <a href="mailto:hello@satoramoto.com?subject=I%20need%20compute"><span>{t('landing.visionary')}</span><strong>{t('landing.need')} <i aria-hidden="true">↗</i></strong></a>
-      <a href="mailto:hello@satoramoto.com?subject=I%20have%20compute"><span>{t('landing.accelerator')}</span><strong>{t('landing.have')} <i aria-hidden="true">↗</i></strong></a>
-    </footer>
   </main>;
 }
