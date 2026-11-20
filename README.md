@@ -17,6 +17,6 @@ Junction keeps the email and each role’s message in memory while the visitor c
 - `npm run build` builds the site into `dist/` for GitHub Pages.
 - `npm run build-storybook` builds the standalone design previews.
 
-GitHub Pages deployment is manual and only runs from the default branch of `satoramoto/web`. Pushing or merging does not publish the site.
+GitHub Pages deploys on every push to the default branch of `satoramoto/web`, including pull request merges. To redeploy the same branch manually, use **Actions → Deploy website to GitHub Pages → Run workflow**. Other branches do not publish the site.
 
 The former band site lives in [ryangavin/funkadelic-astronaut-web](https://github.com/ryangavin/funkadelic-astronaut-web).
