@@ -31,17 +31,8 @@ export default defineConfig({
       '/storybook-server-channel': { target: `http://127.0.0.1:${process.env.STORYBOOK_PORT}`, ws: true },
     },
   } : undefined,
-  // Built pages link their files relatively, so one build works at funkadelicastronaut.com's root or under any subpath.
+  // Relative assets support both the GitHub Pages project URL and the custom domain.
   base: './',
-  // The old vanilla poster is kept in legacy/ but no longer built; public/ serves redirect stubs at its old URLs.
-  build: {
-    rollupOptions: {
-      input: {
-        home: 'index.html',
-        museum: 'museum/index.html'
-      }
-    }
-  },
   test: {
     projects: [
       {

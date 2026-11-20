@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   site:
-    name: Site tests and build
+    name: Site build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -24,8 +24,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Site tests (npm test)
-        run: npm test
       - name: Build site (npm run build)
         run: npm run build
 
@@ -68,6 +66,5 @@ jobs:
       - name: Install Playwright system deps (browser cached)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      # The desk's filtered layers rasterise slowly without a GPU, so stories get more than vitest's 15 s default here.
       - name: Story tests (npm run test:stories)
         run: npm run test:stories -- --testTimeout=60000

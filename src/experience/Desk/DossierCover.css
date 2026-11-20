@@ -1,9 +1,0 @@
-.dossier--branded .folder__sticker { display: block; inset: 0; padding: 0; background: none; box-shadow: none; rotate: 0deg; font: inherit; }
-.dossier-cover { position: absolute; inset: 0; container-type: inline-size; }
-.dossier-cover__brand { position: absolute; left: 3%; right: 3%; top: 12%; display: grid; justify-items: start; gap: 8px; rotate: -2deg; z-index: 2; }
-.dossier-cover__brand .printed-wordmark__ink { font-size: 14cqw; }
-.dossier-cover__brand > :nth-child(2) { margin-left: 1%; rotate: 1.5deg; }
-.dossier-cover__label { position: absolute; top: 45%; left: 9%; padding: 3px 6px; background: #faf6ec; font: 600 5cqw/1.1 var(--font-handwritten, Caveat, cursive); rotate: -2deg; }
-.dossier-cover__note { position: absolute; width: 45%; right: 8%; bottom: 14%; }
-.dossier-cover__streams { position: absolute; display: flex; gap: 7px; bottom: 5%; left: 6%; }
-.dossier-cover__ring { position: absolute; top: 3%; right: 4%; width: 31%; pointer-events: none; }

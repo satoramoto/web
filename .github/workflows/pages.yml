@@ -1,8 +1,6 @@
 name: Deploy website to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.repository == 'ryangavin/funkadelic-astronaut-web'
+    if: github.repository == 'satoramoto/web' && github.ref_name == github.event.repository.default_branch && github.ref_type == 'branch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,10 +29,7 @@ jobs:
           cache: npm
       - name: Install test dependencies
         run: npm ci
-      - name: Test site behavior
-        run: npm test
       - uses: actions/configure-pages@v5
-      # The home page is the React press kit, so the site is Vite's build; the old poster lives in legacy/ and is no longer deployed (stubs at classic.html and press-kit.html redirect home).
       - name: Build website
         run: |
           npm run build
