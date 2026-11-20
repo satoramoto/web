@@ -1,0 +1,51 @@
+.opal {
+  --blue: #92adff;
+  --red: #ffa19a;
+  isolation: isolate;
+  position: relative;
+  box-sizing: border-box;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 2rem;
+  padding: clamp(1.25rem, 5vw, 5rem);
+  background: #08090b;
+  color: #f2f3f5;
+  font: 1rem/1.5 system-ui, sans-serif;
+}
+.opal-field {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 74%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: linear-gradient(90deg, transparent, #000 40%, #000 85%, transparent);
+  background: radial-gradient(ellipse at 35% 55%, #34171d, transparent 28%), radial-gradient(ellipse at 67% 45%, #15244d, transparent 28%);
+  mix-blend-mode: screen;
+}
+.opal-masthead, .opal-paths { display: flex; justify-content: space-between; gap: 1rem; }
+.opal-masthead, .opal-paths a span { font: .72rem/1.5 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .16em; }
+.opal-intro { align-self: center; max-width: 42rem; }
+.opal-intro h1 { font-size: clamp(3rem, 8vw, 8rem); line-height: .93; letter-spacing: -.075em; margin: 0 0 1.5rem; text-wrap: balance; }
+.opal-intro p { max-width: 42ch; color: #c5c9d1; margin: 0; text-wrap: pretty; }
+.opal-paths { border-top: 1px solid #ffffff31; padding-top: 1.2rem; }
+.opal-paths a { color: var(--blue); text-decoration: none; }
+.opal-paths a + a { color: var(--red); text-align: right; }
+.opal-paths strong { display: block; color: #f2f3f5; font-size: clamp(1rem, 2vw, 1.35rem); }
+.opal-paths i { font-style: normal; }
+.opal-paths a:hover strong { text-decoration: underline; text-underline-offset: .25em; }
+.opal-paths a:focus-visible { outline: 2px solid currentColor; outline-offset: .35rem; }
+.opal--observatory { --blue: #89e8da; --red: #ffc294; }
+.opal--observatory .opal-intro { justify-self: center; text-align: center; }
+.opal--observatory h1 { font-family: Georgia, serif; font-weight: 400; letter-spacing: -.055em; }
+.opal--observatory p { margin-inline: auto; }
+.opal--observatory .opal-field { width: 100%; opacity: .48; }
+.opal--standing { --blue: #89e8da; --red: #ffc294; }
+.opal--standing .opal-intro { justify-self: end; }
+.opal--standing h1 { font-family: ui-monospace, monospace; font-size: clamp(2.5rem, 6vw, 6rem); }
+.opal--standing .opal-field { inset: 0 auto 0 0; opacity: .55; }
+@media (max-width: 640px) {
+  .opal-field { width: 100%; opacity: .55; }
+  .opal-intro { text-shadow: 0 1px 10px #08090b; }
+}

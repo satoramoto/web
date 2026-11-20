@@ -1,4 +1,14 @@
 {
+  "opal": {
+    "brand": "Satoramoto",
+    "platform": "Introducing Opal",
+    "headline": "Put idle GPUs to work.",
+    "description": "Opal buys spare GPU capacity to make compute more affordable and help providers earn from time that would otherwise go unused. We’re building toward confidential computing on NVIDIA GPUs for sensitive research and workloads.",
+    "visionary": "Visionary",
+    "accelerator": "Accelerator",
+    "need": "Need compute?",
+    "have": "Have compute?"
+  },
   "band": {
     "links": {
       "applemusic": "Funkadelic Astronaut on Apple Music",
