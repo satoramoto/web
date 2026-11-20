@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,700;1,400&display=swap');
 
 .opal {
   --blue: #92adff;
@@ -27,6 +27,7 @@
   mix-blend-mode: screen;
 }
 .opal-intro { align-self: center; max-width: 42rem; }
+.opal-intro--junction { width: 100%; max-width: none; min-width: 0; }
 .opal-intro h1 { font-size: clamp(2rem, 10vw, 8rem); line-height: .93; letter-spacing: -.075em; margin: 0; }
 .opal-tagline { margin: 1rem 0 clamp(2rem, 5vw, 3.75rem); color: #c5c9d1; font-size: clamp(.875rem, 1.6vw, 1.125rem); text-wrap: balance; }
 .opal--observatory { --blue: #89e8da; --red: #ffc294; }
@@ -34,7 +35,6 @@
 .opal--observatory h1 { font-weight: 400; letter-spacing: -.055em; }
 .opal--observatory .opal-paths { justify-content: center; }
 .opal--observatory .opal-field { width: 100%; opacity: .48; }
-.opal--observatory .opal-field--routed { opacity: 1; mask-image: none; }
 .opal--standing { --blue: #89e8da; --red: #ffc294; }
 .opal--standing .opal-intro { justify-self: end; }
 .opal--standing h1 { font-size: clamp(2rem, 8vw, 6rem); }

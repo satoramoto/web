@@ -1,12 +1,10 @@
 .junction-console {
   --ink: #f2f3f5;
-  --guide: #858f9f;
   --metal: #b3bcc9;
   --accent: var(--blue);
-  --die-width: clamp(2.625rem, 8vw, 3.5rem);
-  --route-width: clamp(2rem, 6vw, 4rem);
-  width: min(100%, 27rem);
+  width: min(100%, 72rem);
   margin-inline: auto;
+  container-type: inline-size;
   text-align: left;
 }
 .junction-console[data-selected="accelerator"] { --accent: var(--red); }
@@ -15,40 +13,31 @@
 .junction-panel { display: grid; grid-template-rows: 1fr; opacity: 1; }
 .junction-panel[data-open="false"] { grid-template-rows: 0fr; opacity: 0; }
 .junction-clip { min-height: 0; overflow: clip; }
-.junction-heading { margin: .25rem 0 .25rem calc(var(--die-width) + var(--route-width) + .625rem); font-size: .875rem; font-weight: 500; color: var(--metal); }
-.contact--junction {
-  display: grid; grid-template-columns: var(--die-width) minmax(0, 1fr);
-  grid-template-rows: repeat(2, minmax(4rem, 1fr)); padding: 3px 3px 4px 0;
+.junction-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  justify-content: center;
+  align-items: baseline;
+  gap: clamp(.75rem, calc(10cqi - 4rem), 3rem);
+  padding: .3rem;
+  font-size: clamp(.875rem, 1.86cqi, 1.125rem);
+  line-height: 1.45;
 }
-.junction-die { grid-row: span 2; align-self: center; width: 100%; height: 3rem; pointer-events: all; }
-.die-pin { stroke: var(--guide); }
-.die-core { stroke: var(--active-core, var(--guide)); fill: color-mix(in srgb, var(--active-core, transparent) 40%, transparent); }
-.contact--junction:where(:has([data-role="visionary"]:is(:hover, :focus-visible))) { --active-core: var(--blue); }
-.contact--junction:where(:has([data-role="accelerator"]:is(:hover, :focus-visible))) { --active-core: var(--red); }
-.contact--junction[data-signal="visionary"] { --active-core: var(--blue); }
-.contact--junction[data-signal="accelerator"] { --active-core: var(--red); }
-.contact--junction[data-signal="both"] { --active-core: #c2cde0; }
-.contact--junction .junction-choice {
+.junction-choice {
   --accent: var(--blue);
-  display: grid; grid-template-columns: var(--route-width) minmax(0,1fr); align-items: center;
-  padding: 0; border: 0; background: transparent; color: var(--accent); text-align: left;
+  min-width: 0; min-height: 2.75rem; padding: .55rem 0; border: 0;
+  background: transparent; color: var(--ink); text-align: center; text-wrap: balance;
 }
-.contact--junction [data-role="accelerator"] { --accent: var(--red); }
-.junction-route { width: 100%; height: 100%; stroke: var(--guide); }
-.junction-route :is(polyline, path, circle) { vector-effect: non-scaling-stroke; stroke-width: 1.25; }
-.junction-route circle { stroke: currentColor; fill: #08090b; }
-.junction-choice:is(:hover,:focus-visible) .junction-route { stroke: currentColor; }
-.junction-choice:is(:hover,:focus-visible) circle { fill: currentColor; }
-.junction-question { margin-left: .625rem; color: var(--ink); font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.32; text-wrap: balance; }
-.junction-question > span { display: block; }
-.junction-question strong { font-weight: 500; color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 50%, transparent); text-underline-offset: .18em; }
-.junction-choice:is(:hover,:focus-visible) strong { text-decoration-color: currentColor; }
-.junction-console .junction-choice:focus-visible { outline: none; }
-.junction-choice:focus-visible .junction-question { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
-@media (max-width: 24rem) {
-  .junction-question { padding-block: .38rem; }
-  .junction-route { height: 4rem; align-self: end; }
-  [data-role="accelerator"] .junction-route { align-self: start; }
+.junction-choice[data-role="accelerator"] { --accent: var(--red); }
+.junction-choice strong { color: var(--accent); font-weight: 700; }
+.junction-choice em { font-style: italic; }
+.junction-choice:is(:hover, :focus-visible) strong { color: color-mix(in srgb, var(--accent) 80%, white); }
+/* Below the width of both sentences, let them wrap instead of shrinking the type further. */
+@container (max-width: 45.5rem) {
+  .junction-choices { font-size: .9375rem; }
+}
+@media (max-width: 64rem) {
+  .opal:has(.opal-intro--junction) { padding-inline: clamp(.75rem, 2vw, 1.25rem); }
 }
 .junction-form {
   --lead: clamp(.85rem, 3vw, 1.5rem);
@@ -56,8 +45,7 @@
   width: min(100% - .5rem, 25rem); box-sizing: border-box; border-left: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
 }
 .junction-form :is(header,footer) { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
-.junction-form h2 { position: relative; color: var(--accent); font-weight: 500; font-size: 1.125rem; margin: 0; }
-.junction-form h2::before { content: ''; position: absolute; right: calc(100% + .35rem); top: 50%; width: calc(var(--lead) - .35rem); height: 1px; background: var(--accent); }
+.junction-form h2 { color: var(--accent); font-weight: 500; font-size: 1.125rem; margin: 0; }
 .junction-form label { display: grid; gap: .3rem; font-size: .875rem; color: #d5d9e0; }
 .junction-form :is(input,textarea) {
   box-sizing: border-box; width: 100%; border: 1px solid #4b515c; border-radius: .25rem;

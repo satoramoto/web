@@ -4,7 +4,7 @@ Company landing page for Satoramoto. The public entry point uses Interference. *
 
 | Story | What to look for |
 | --- | --- |
-| Junction | Hover or focus a question to power its circuit; select a role to send a wave from the chip and open its contact form. Inspired by the [V–A–C Foundation’s connected navigation](https://v-a-c.org/). |
+| Junction | Two questions sit side by side. Select the blue **visionary** or gold **accelerator** to send a wave outward from that word and open its contact form. |
 | Marginalia | Two questions stagger across the field, with raised role labels and detached arrow circles. The reference is [Elvina Prasad’s typographic navigation](https://elvinaprasad.com/). |
 | Keybed | Two pressable keys in one housing, with fan-in and fan-out markings. Inspired by [teenage engineering’s Oplab hardware and port legends on Refero](https://refero.design/pages/20c66c64-a411-496f-a7ff-5153b8c900f0). |
 | Contact Rows | A compact directory with one audience per row. |

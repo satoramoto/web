@@ -9,9 +9,10 @@
     "have": "Have compute?"
   },
   "junction": {
+    "choose": "Choose a contact path",
     "question": {
-      "visionary": "Are you a <strong>visionary</strong> <span>building something revolutionary?</span>",
-      "accelerator": "Are you an <strong>accelerator</strong> <span>looking to change the world?</span>"
+      "visionary": "Are you a <strong>visionary</strong> building <em>something revolutionary</em>?",
+      "accelerator": "Are you an <strong>accelerator</strong> looking to <em>change the world</em>?"
     },
     "message": {
       "visionary": "What are you building?",
