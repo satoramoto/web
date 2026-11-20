@@ -45,14 +45,21 @@ export const WritingSurface: Story = {
   play: async context => {
     await openForm(context);
     const { canvas } = context;
-    const edge = (role: string, name: string) => canvas.getByRole(role, { name }).getBoundingClientRect();
+    const find = (role: string, name: string) => canvas.getByRole(role, { name });
+    const edge = (role: string, name: string) => find(role, name).getBoundingClientRect();
+    const middle = (rect: DOMRect) => rect.top + rect.height / 2;
     const emailField = edge('textbox', 'your email');
     const messageField = edge('textbox', 'what are you building?');
+    const path = edge('button', 'change path');
+    const action = edge('button', send);
+    await expect(find('textbox', 'your email')).toHaveAttribute('placeholder', 'your email');
+    await expect(find('textbox', 'what are you building?')).toHaveAttribute('placeholder', 'what are you building?');
     await expect(emailField.left).toBeCloseTo(messageField.left);
     await expect(edge('heading', 'visionary').left).toBeCloseTo(messageField.left);
     await expect(emailField.right).toBeCloseTo(messageField.right);
-    await expect(edge('button', 'change path').right).toBeCloseTo(messageField.right);
-    await expect(edge('button', send).right).toBeCloseTo(messageField.right);
+    await expect(path.right).toBeLessThan(action.left);
+    await expect(middle(path)).toBeCloseTo(middle(action));
+    await expect(action.right).toBeCloseTo(messageField.right);
   },
 };
 

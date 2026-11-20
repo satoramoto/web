@@ -26,6 +26,8 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
   const reply = step === 'reply';
   const sent = step === 'sent';
   const sending = status === 'sending';
+  const emailPrompt = t('junction.email');
+  const messagePrompt = t(`junction.message.${role}`);
 
   useLayoutEffect(() => {
     if (sent) receiptRef.current?.focus({ preventScroll: true });
@@ -123,26 +125,25 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
     <div className="junction-panel" data-open={reply} inert={!reply} aria-hidden={!reply}>
       <div className="junction-clip">
         <form id={formId} className="junction-form" data-status={status} aria-labelledby={`${formId}-role`} onSubmit={compose}>
-          <header>
-            <h2 id={`${formId}-role`}>{t(`landing.${role}`)}</h2>
-            <button type="button" className="junction-back" disabled={sending} onClick={returnToChoices}>{t('junction.change')}</button>
-          </header>
-          <label>{t('junction.email')}
-            <input ref={emailRef} name="email" type="email" autoComplete="email" value={email} maxLength={254} required readOnly={sending} onChange={event => setEmail(event.target.value)} />
-          </label>
-          <label>{t(`junction.message.${role}`)}
-            <textarea ref={messageRef} name="message" rows={3} value={messages[role]} maxLength={4000} required readOnly={sending} onChange={event => {
+          <input ref={emailRef} name="email" type="email" autoComplete="email" aria-label={emailPrompt} placeholder={emailPrompt}
+            value={email} maxLength={254} required readOnly={sending} onChange={event => setEmail(event.target.value)} />
+          <textarea ref={messageRef} name="message" rows={3} aria-label={messagePrompt} placeholder={messagePrompt}
+            value={messages[role]} maxLength={4000} required readOnly={sending} onChange={event => {
               event.target.setCustomValidity(''); setMessages({ ...messages, [role]: event.target.value });
             }} />
-          </label>
           {sendContact && <div className="junction-challenge" ref={challengeRef} />}
           {status === 'failed' && <p className="junction-error" role="alert">{t('junction.sendFailed')}</p>}
+          <p className="junction-status" role="status">{sending ? t('junction.sending') : ''}</p>
+          {!sendContact && <p className="junction-address">{inbox}</p>}
           <footer>
-            {!sendContact && <span>{inbox}</span>}
+            <div className="junction-path">
+              <h2 id={`${formId}-role`}>{t(`landing.${role}`)}</h2>
+              <span aria-hidden="true">·</span>
+              <button type="button" className="junction-back" disabled={sending} onClick={returnToChoices}>{t('junction.change')}</button>
+            </div>
             <button type="submit" className="junction-send" ref={sendRef} aria-disabled={sending || undefined}>
               <span>{t(sendContact ? 'junction.send' : 'junction.draft')}</span><span className="junction-send-mark" aria-hidden="true" />
             </button>
-            <span role="status">{sending ? t('junction.sending') : ''}</span>
           </footer>
         </form>
       </div>
