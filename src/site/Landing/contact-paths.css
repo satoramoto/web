@@ -1,0 +1,81 @@
+/* One type scale across the Observatory studies; the composition changes, not the roles. */
+.opal-paths { margin-inline: auto; }
+.opal-paths a { box-sizing: border-box; color: var(--blue); text-decoration: none; }
+.opal-paths [data-role="accelerator"] { color: var(--red); }
+.opal-paths a:focus-visible { outline: 2px solid currentColor; outline-offset: .35rem; }
+.opal-path-label { display: block; font-size: .875rem; line-height: 1.25; font-weight: 500; }
+.contact-question { display: block; color: #f2f3f5; font-size: 1.125rem; line-height: 1.25; font-weight: 400; }
+.opal-paths i { font-style: normal; }
+
+/* The public entry and the two retained comparison stories. */
+.contact--original { display: flex; flex-wrap: wrap; gap: 1rem clamp(1.5rem, 6vw, 6rem); }
+.contact--original .opal-path-label { font-size: clamp(1.25rem, 2.5vw, 1.6875rem); }
+.contact--original [data-role="accelerator"] .opal-path-label { font-size: clamp(1.05rem, 2.1vw, 1.4175rem); }
+.contact--original strong { font-size: clamp(1rem, 2vw, 1.35rem); font-weight: 700; line-height: inherit; }
+:is(.contact--original, .contact--hairline-edge) a:hover strong { text-decoration: underline; text-underline-offset: .25em; }
+.contact--hairline-edge { display: grid; max-width: 24rem; border-top: 1px solid #ffffff33; }
+.contact--hairline-edge a {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; align-content: center;
+  width: 100%; min-height: 3.25rem; gap: .75rem; padding-inline: .5rem; text-align: left;
+  border: 1px solid transparent; border-block-end-color: #ffffff33;
+}
+.contact--hairline-edge strong { text-align: right; }
+.contact--hairline-edge i { margin-inline-start: .25em; color: #c5c9d1; }
+.contact--quiet-pill { display: flex; flex-wrap: wrap; gap: .75rem clamp(.5rem, 3vw, 2.25rem); }
+.contact--quiet-pill a {
+  display: grid; align-content: center; gap: .6rem; min-height: 4.25rem;
+  width: min(10rem, calc((100% - .75rem) / 2)); border: 1px solid transparent;
+}
+.contact--quiet-pill strong {
+  display: grid; place-items: center; min-height: 2.75rem; padding: .3rem .55rem;
+  border: 1px solid #ffffff40; border-radius: 999px; background: #14161bcc;
+}
+.contact--quiet-pill a:hover strong { border-color: currentColor; background: #24272e; }
+
+/* Marginalia: a diagonal of single-line links with raised role notes. */
+.contact--marginalia { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35rem; width: min(100%, 31rem); }
+.contact--marginalia a { display: flex; align-items: center; justify-self: start; min-height: 2.875rem; }
+.contact--marginalia a + a { justify-self: end; }
+.contact--marginalia .opal-path-label { margin-inline: .35rem .8rem; transform: translateY(-.48rem); }
+.note-arrow {
+  display: grid; place-items: center; flex: none; width: 2.125rem; height: 2.125rem;
+  border: 1px solid #8b9099; border-radius: 50%; color: #f2f3f5;
+}
+.note-arrow svg { width: 1.125rem; height: 1.125rem; }
+.contact--marginalia a:is(:hover, :focus-visible) .note-arrow { background: #e5e7e8; border-color: #e5e7e8; color: #101114; }
+
+/* Keybed: both caps sit in one shallow graphite housing. Only the cap travels. */
+.contact--keybed {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .375rem;
+  box-sizing: border-box; width: min(100%, 27rem); padding: .5rem .5rem .4rem;
+  border: 1px solid #43474c; border-radius: .55rem; background: #191b1e;
+  box-shadow: inset 0 1px #ffffff12, 0 3px 8px #0008; text-shadow: none;
+}
+.contact--keybed a { display: grid; min-width: 0; border-radius: .22rem; }
+.contact--keybed a:focus-visible { outline-offset: .1rem; }
+.key-face {
+  display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  box-sizing: border-box; min-height: 3.25rem; padding: .5rem .8rem; text-align: left;
+  border-radius: .22rem; color: #191d21; background: linear-gradient(#c2c5c6, #b2b6b7);
+  box-shadow: inset 0 1px #ffffffe0, inset 1px 0 #ffffff45, inset 0 -1px #858a8d, 0 3px #555b60, 0 4px 0 1px #101114;
+}
+.key-mark { flex: none; width: 1.45rem; height: .875rem; }
+.key-face strong { color: inherit; }
+.contact--keybed .opal-path-label { display: flex; align-items: center; gap: .5rem; padding: .7rem .6rem .16rem; text-align: left; }
+.contact--keybed .opal-path-label::before { content: ''; width: .75rem; height: 2px; background: currentColor; }
+.contact--keybed a:is(:hover, :focus-visible) .key-face { background: #d2d5d5; }
+.contact--keybed a:active .key-face { box-shadow: inset 0 1px #ffffff90, 0 1px #555b60, 0 2px 0 1px #101114; }
+@media (prefers-reduced-motion: no-preference) {
+  .key-face { transition: transform 90ms ease-out, box-shadow 90ms ease-out; }
+  .contact--keybed a:active .key-face { transform: translateY(2px); }
+}
+@media (max-width: 30rem) {
+  .key-face { flex-direction: column; align-items: flex-start; gap: .25rem; padding: .45rem .6rem; }
+  .key-mark { width: 1.2rem; height: .75rem; }
+}
+@media (max-width: 24rem) {
+  .contact--keybed { width: min(100%, 20rem); grid-template-columns: 1fr; gap: .6rem; padding-bottom: .7rem; }
+  .contact--keybed a { grid-template-columns: minmax(0, 1fr) 5.4rem; align-items: center; gap: .6rem; }
+  .contact--keybed .opal-path-label { padding: 0; }
+  .contact--keybed .opal-path-label::before { display: none; }
+}

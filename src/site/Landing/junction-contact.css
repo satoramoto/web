@@ -1,0 +1,80 @@
+.junction-console {
+  --ink: #f2f3f5;
+  --metal: #b3bcc9;
+  --accent: var(--blue);
+  width: min(100%, 72rem);
+  margin-inline: auto;
+  container-type: inline-size;
+  text-align: left;
+}
+.junction-console[data-selected="accelerator"] { --accent: var(--red); }
+.junction-console button { font: inherit; cursor: pointer; }
+.junction-console :is(button, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.junction-panel { opacity: 1; }
+.junction-panel[data-open="false"] { display: none; }
+.junction-clip { min-height: 0; overflow: clip; }
+.junction-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  justify-content: center;
+  align-items: baseline;
+  gap: clamp(.75rem, calc(10cqi - 4rem), 3rem);
+  padding: .3rem;
+  font-size: clamp(.875rem, 1.86cqi, 1.125rem);
+  line-height: 1.45;
+}
+.junction-choice {
+  --accent: var(--blue);
+  min-width: 0; min-height: 2.75rem; padding: .55rem 0; border: 0;
+  background: transparent; color: var(--ink); text-align: center; white-space: pre-line; text-wrap: balance;
+}
+.junction-choice[data-role="accelerator"] { --accent: var(--red); }
+.junction-choice strong { color: var(--accent); font-weight: 700; }
+.junction-choice em { font-style: italic; }
+.junction-choice:is(:hover, :focus-visible) strong { color: color-mix(in srgb, var(--accent) 80%, white); }
+/* Keep the continuations readable when the two columns have to wrap. */
+@container (max-width: 45.5rem) {
+  .junction-choices { font-size: .9375rem; }
+}
+@container (max-width: 21rem) {
+  /* The longer “are you an accelerator” needs slightly more of the same row. */
+  .junction-choices { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); column-gap: .5rem; padding-inline: .15rem; font-size: .875rem; }
+}
+@media (max-width: 64rem) {
+  .opal:has(.opal-intro--junction) { padding-inline: clamp(.75rem, 2vw, 1.25rem); }
+}
+.junction-form {
+  --lead: clamp(.85rem, 3vw, 1.5rem);
+  display: grid; gap: .8rem; margin: .25rem auto; padding: .35rem .35rem .35rem var(--lead);
+  width: min(100% - .5rem, 25rem); box-sizing: border-box; border-left: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.junction-form :is(header,footer) { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.junction-form h2 { color: var(--accent); font-weight: 500; font-size: 1.125rem; margin: 0; }
+.junction-form label { display: grid; gap: .3rem; font-size: .875rem; color: #d5d9e0; }
+.junction-form :is(input,textarea) {
+  box-sizing: border-box; width: 100%; border: 1px solid #4b515c; border-radius: .25rem;
+  padding: .5rem .65rem; color: var(--ink); background: #0c1015ec; font: inherit; font-size: 1rem; line-height: 1.4; color-scheme: dark;
+}
+.junction-form textarea { resize: vertical; min-height: 3.5rem; }
+.junction-form button { min-height: 2.75rem; }
+.junction-back { border: 0; padding: 0 .2rem; color: var(--metal); background: transparent; text-decoration: underline; text-underline-offset: .2em; }
+.junction-form .junction-back, .junction-form footer { font-size: .8125rem; }
+.junction-form footer { color: var(--metal); }
+.junction-form [type="submit"] { border-radius: .25rem; padding: .4rem .75rem; background: #171b23; color: var(--ink); border: 1px solid #646c79; font-weight: 500; }
+.junction-form [type="submit"]:hover { border-color: var(--accent); }
+@media (max-width: 24rem) {
+  .junction-form footer { flex-direction: column-reverse; align-items: stretch; gap: .4rem; }
+  .junction-form footer > span { text-align: center; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .junction-panel[data-open="true"] { animation: junction-reveal 190ms ease-out; }
+  .junction-console[data-step="charge"] .junction-choices { opacity: 0; transition: opacity 150ms ease-in 190ms; }
+  @keyframes junction-reveal { from { opacity: 0; } to { opacity: 1; } }
+}
+@media (max-height: 35rem) {
+  .opal:has(.junction-console) { padding-block: .75rem; }
+  .opal:has(.junction-console[data-step="reply"]) h1 { font-size: clamp(2rem, 8vh, 3rem); }
+  .opal:has(.junction-console) .opal-tagline { margin-block: .5rem .8rem; }
+  .junction-form { gap: .35rem; }
+  .junction-form textarea { height: 3.5rem; }
+}

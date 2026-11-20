@@ -1,9 +1,5 @@
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PressKit } from './PressKit/PressKit';
+import { Landing } from './Landing/Landing';
+import './site.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <PressKit />
-  </StrictMode>,
-);
+createRoot(document.getElementById('root')!).render(<Landing variant="observatory" palette="silver-gold" labels="junction" />);

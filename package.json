@@ -1,17 +1,14 @@
 {
-  "name": "funkadelic-astronaut-web",
+  "name": "satoramoto-web",
   "private": true,
   "version": "1.0.0",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "tsc --noEmit && vite build && node scripts/copy-static-build.cjs",
-    "test:legacy": "cd legacy && node --test tests/*.test.cjs",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "node --test tests/*.test.cjs && npm run test:legacy",
-    "test:stories": "vitest --project=storybook --run",
-    "build:museum": "tsc --noEmit && vite build --config vite.museum.config.mts"
+    "test:stories": "vitest --project=storybook --run"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.3.1",
@@ -33,7 +30,6 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
-    "butterchurn": "2.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   }

@@ -1,8 +1,0 @@
-/* Headline bars: a band of spot ink, multiplied onto the stock, the words reversed out. */
-.epk-bar {
-  padding: 0.12em 0.25em 0.06em;
-  background: var(--ink);
-  color: var(--on-ink);
-  font-size: var(--epk-text-bar);
-  line-height: 0.92;
-}
