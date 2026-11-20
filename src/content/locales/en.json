@@ -1,29 +1,29 @@
 {
   "landing": {
     "brand": "satoramoto",
-    "contact": "Get in touch",
-    "description": "expanding access to infrastructure, inference, and developer tooling.",
-    "visionary": "Visionary",
-    "accelerator": "Accelerator",
-    "need": "Need compute?",
-    "have": "Have compute?"
+    "contact": "get in touch",
+    "description": "expanding access to infrastructure, inference, and developer tooling",
+    "visionary": "visionary",
+    "accelerator": "accelerator",
+    "need": "need compute?",
+    "have": "have compute?"
   },
   "junction": {
-    "choose": "Choose a contact path",
+    "choose": "choose a contact path",
     "question": {
-      "visionary": "Are you a <strong>visionary</strong> building <em>something revolutionary</em>?",
-      "accelerator": "Are you an <strong>accelerator</strong> looking to <em>change the world</em>?"
+      "visionary": "are you a <strong>visionary</strong>\nbuilding <em>something revolutionary</em>?",
+      "accelerator": "are you an <strong>accelerator</strong>\nlooking to <em>change the world</em>?"
     },
     "message": {
-      "visionary": "What are you building?",
-      "accelerator": "What do you have to offer?"
+      "visionary": "what are you building?",
+      "accelerator": "what do you have to offer?"
     },
-    "email": "Your email",
-    "change": "Change path",
-    "draft": "Open email draft",
+    "email": "your email",
+    "change": "change path",
+    "draft": "open email draft",
     "recipient": "hello@satoramoto.com",
-    "emptyMessage": "Write a message to include in your draft.",
+    "emptyMessage": "write a message to include in your draft.",
     "subject": "{{role}} inquiry to satoramoto",
-    "body": "{{role}}\r\nReply to: {{email}}\r\n\r\n{{message}}"
+    "body": "{{role}}\r\nreply to: {{email}}\r\n\r\n{{message}}"
   }
 }

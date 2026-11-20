@@ -10,8 +10,8 @@
 .junction-console[data-selected="accelerator"] { --accent: var(--red); }
 .junction-console button { font: inherit; cursor: pointer; }
 .junction-console :is(button, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.junction-panel { display: grid; grid-template-rows: 1fr; opacity: 1; }
-.junction-panel[data-open="false"] { grid-template-rows: 0fr; opacity: 0; }
+.junction-panel { opacity: 1; }
+.junction-panel[data-open="false"] { display: none; }
 .junction-clip { min-height: 0; overflow: clip; }
 .junction-choices {
   display: grid;
@@ -26,15 +26,19 @@
 .junction-choice {
   --accent: var(--blue);
   min-width: 0; min-height: 2.75rem; padding: .55rem 0; border: 0;
-  background: transparent; color: var(--ink); text-align: center; text-wrap: balance;
+  background: transparent; color: var(--ink); text-align: center; white-space: pre-line; text-wrap: balance;
 }
 .junction-choice[data-role="accelerator"] { --accent: var(--red); }
 .junction-choice strong { color: var(--accent); font-weight: 700; }
 .junction-choice em { font-style: italic; }
 .junction-choice:is(:hover, :focus-visible) strong { color: color-mix(in srgb, var(--accent) 80%, white); }
-/* Below the width of both sentences, let them wrap instead of shrinking the type further. */
+/* Keep the continuations readable when the two columns have to wrap. */
 @container (max-width: 45.5rem) {
   .junction-choices { font-size: .9375rem; }
+}
+@container (max-width: 21rem) {
+  /* The longer “are you an accelerator” needs slightly more of the same row. */
+  .junction-choices { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); column-gap: .5rem; padding-inline: .15rem; font-size: .875rem; }
 }
 @media (max-width: 64rem) {
   .opal:has(.opal-intro--junction) { padding-inline: clamp(.75rem, 2vw, 1.25rem); }
@@ -63,7 +67,9 @@
   .junction-form footer > span { text-align: center; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .junction-panel { transition: grid-template-rows 300ms cubic-bezier(.2,.7,.25,1), opacity 180ms ease-out; }
+  .junction-panel[data-open="true"] { animation: junction-reveal 190ms ease-out; }
+  .junction-console[data-step="charge"] .junction-choices { opacity: 0; transition: opacity 150ms ease-in 190ms; }
+  @keyframes junction-reveal { from { opacity: 0; } to { opacity: 1; } }
 }
 @media (max-height: 35rem) {
   .opal:has(.junction-console) { padding-block: .75rem; }

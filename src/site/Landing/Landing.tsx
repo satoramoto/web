@@ -31,14 +31,22 @@ void main(){
   float x=p.x;
   float bend=.08*sin(x*5.+time*.45)+.045*sin(x*11.-time*.23)+.065*pulse;
   if(mode<1.5) bend+=.13*pointer*mouse.y;
+  // Adjacent strands differ by a constant phase. Rotate the two oscillators
+  // instead of evaluating 36 separate sine functions per pixel.
+  float cy=4.*x-time*.35, wz=4.*x+time*.3;
+  vec2 cold=vec2(sin(cy),cos(cy)), gold=vec2(sin(wz),cos(wz));
+  const float c=cos(3./17.), s=sin(3./17.);
+  const mat2 forward=mat2(c,-s,s,c), backward=mat2(c,s,-s,c);
+  float coolGain=smoothstep(-.85,.35,x), warmGain=1.-smoothstep(-.35,.85,x);
   vec3 color=vec3(0.);
   float coverage=0.;
   for(int i=0;i<18;i++){
     float n=float(i)/17.;
-    float y=bend+(.08+n*.17)*sin(4.*x+n*3.-time*.35)+(n-.5)*.23;
-    float z=-bend+(.08+n*.17)*sin(4.*x-n*3.+time*.3)+(n-.5)*.23;
-    float frontCool=exp(-abs(p.y-y)*200.)*smoothstep(-.85,.35,x);
-    float frontWarm=exp(-abs(p.y-z)*200.)*(1.-smoothstep(-.35,.85,x));
+    float y=bend+(.08+n*.17)*cold.x+(n-.5)*.23;
+    float z=-bend+(.08+n*.17)*gold.x+(n-.5)*.23;
+    cold=forward*cold; gold=backward*gold;
+    float frontCool=exp(-abs(p.y-y)*200.)*coolGain;
+    float frontWarm=exp(-abs(p.y-z)*200.)*warmGain;
     color+=.12*(cool*frontCool+warm*frontWarm);
     coverage=max(coverage,max(frontCool,frontWarm));
   }
@@ -91,6 +99,17 @@ function Field({ variant, palette, signal }: FieldProps) {
     let frame = 0, hit = -10000, mx = 0, my = 0, ox = 0, oy = 0;
     const stage = canvas.parentElement!;
     let ignitionTime = -Infinity, ix = 0, iy = 0, polarity = 0;
+    // The field has soft edges; spend the pixel budget on motion. CSS keeps
+    // every letter at native resolution, including on high-DPI phones.
+    let cssWidth = canvas.clientWidth, cssHeight = canvas.clientHeight;
+    let budget = 450000, lastFrame = 0, slowFrames = 0, framesSeen = 0;
+    const sizeField = () => {
+      const scale = Math.min(1, Math.sqrt(budget / Math.max(1, cssWidth * cssHeight)));
+      const w = Math.max(1, Math.round(cssWidth * scale)), h = Math.max(1, Math.round(cssHeight * scale));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      gl.viewport(0, 0, w, h);
+      gl.uniform2f(uniforms.size, w, h);
+    };
     const move = (event: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
       mx = (event.clientX - box.left - box.width / 2) / box.height;
@@ -103,22 +122,38 @@ function Field({ variant, palette, signal }: FieldProps) {
     const start = performance.now();
     const uniforms = Object.fromEntries(['size', 'mouse', 'origin', 'time', 'age', 'mode', 'ignition'].map(key => [key, gl.getUniformLocation(program, key)]));
     const draw = (now: number) => {
-      const w = Math.min(1400, Math.round(canvas.clientWidth));
-      const h = Math.round(canvas.clientHeight * w / Math.max(1, canvas.clientWidth));
-      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-      gl.viewport(0, 0, w, h);
       const elapsed = (now - ignitionTime) / 1000 - .11;
       gl.uniform4f(uniforms.ignition, ix, iy, !motion.matches && elapsed < 1.6 ? elapsed : -1, polarity);
-      gl.uniform2f(uniforms.size, w, h);
       gl.uniform2f(uniforms.mouse, motion.matches ? 0 : mx, motion.matches ? 0 : my);
       gl.uniform2f(uniforms.origin, ox, oy);
       gl.uniform1f(uniforms.time, motion.matches || variant === 'standing' ? 0 : (now - start) / 1000);
       gl.uniform1f(uniforms.age, motion.matches ? 10 : Math.min(10, (now - hit) / 1000));
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
-    const loop = (now: number) => { draw(now); frame = requestAnimationFrame(loop); };
-    const update = () => { cancelAnimationFrame(frame); if (motion.matches) draw(performance.now()); else frame = requestAnimationFrame(loop); };
-    const resize = new ResizeObserver(() => draw(performance.now()));
+    const loop = (now: number) => {
+      // Downshift during ordinary animation, never resize a buffer mid-burst.
+      const dt = now - lastFrame; lastFrame = now;
+      if (dt > 0 && dt < 150 && now - ignitionTime > 1900) {
+        if (dt > 24) slowFrames++;
+        if (++framesSeen >= 18) {
+          if (slowFrames >= 10 && budget > 180000 && cssWidth * cssHeight > 180000) {
+            budget = Math.max(180000, Math.min(budget, cssWidth * cssHeight) * .65);
+            sizeField();
+          }
+          framesSeen = 0; slowFrames = 0;
+        }
+      }
+      draw(now); frame = requestAnimationFrame(loop);
+    };
+    const update = () => {
+      cancelAnimationFrame(frame); lastFrame = 0;
+      if (document.hidden) return;
+      if (motion.matches) draw(performance.now()); else frame = requestAnimationFrame(loop);
+    };
+    const resize = new ResizeObserver(([entry]) => {
+      cssWidth = entry.contentRect.width; cssHeight = entry.contentRect.height;
+      sizeField(); if (motion.matches) draw(performance.now());
+    });
     if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
       gl.useProgram(program);
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -144,12 +179,14 @@ function Field({ variant, palette, signal }: FieldProps) {
       stage.addEventListener('pointermove', move);
       stage.addEventListener('pointerdown', tap);
       motion.addEventListener('change', update);
-      resize.observe(canvas);
+      document.addEventListener('visibilitychange', update);
+      sizeField(); resize.observe(canvas);
       update();
     }
     return () => {
       cancelAnimationFrame(frame); resize.disconnect();
       motion.removeEventListener('change', update);
+      document.removeEventListener('visibilitychange', update);
       stage.removeEventListener('pointermove', move); stage.removeEventListener('pointerdown', tap);
       signal.current = null;
       gl.deleteProgram(program); gl.deleteBuffer(buffer);

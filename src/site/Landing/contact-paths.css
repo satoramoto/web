@@ -9,7 +9,7 @@
 
 /* The public entry and the two retained comparison stories. */
 .contact--original { display: flex; flex-wrap: wrap; gap: 1rem clamp(1.5rem, 6vw, 6rem); }
-.contact--original .opal-path-label { font-size: clamp(1.25rem, 2.5vw, 1.6875rem); text-transform: uppercase; }
+.contact--original .opal-path-label { font-size: clamp(1.25rem, 2.5vw, 1.6875rem); }
 .contact--original [data-role="accelerator"] .opal-path-label { font-size: clamp(1.05rem, 2.1vw, 1.4175rem); }
 .contact--original strong { font-size: clamp(1rem, 2vw, 1.35rem); font-weight: 700; line-height: inherit; }
 :is(.contact--original, .contact--hairline-edge) a:hover strong { text-decoration: underline; text-underline-offset: .25em; }

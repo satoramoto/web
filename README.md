@@ -1,6 +1,6 @@
 # Satoramoto
 
-Company landing page for Satoramoto. The public entry point uses Interference. **Site / Satoramoto** in Storybook compares five contact treatments on the blue-and-gold Observatory scene.
+Company landing page for satoramoto. The public entry point uses Junction on the blue-and-gold Observatory scene. **Site / Satoramoto** in Storybook compares the published design with four other contact treatments.
 
 | Story | What to look for |
 | --- | --- |
@@ -10,7 +10,7 @@ Company landing page for Satoramoto. The public entry point uses Interference. *
 | Contact Rows | A compact directory with one audience per row. |
 | Quiet Pill | A role label above each standalone question button. |
 
-Junction keeps the email and each role’s message in memory while the visitor changes paths. **Open email draft** hands the selected role, reply address, and message to the visitor’s email app, addressed to `hello@satoramoto.com`. The static site does not submit or store the inquiry. Reduced motion opens the form immediately; WebGL is decorative and not required for either path.
+Junction keeps the email and each role’s message in memory while the visitor changes paths. **open email draft** hands the selected role, reply address, and message to the visitor’s email app, addressed to `hello@satoramoto.com`. The static site does not submit or store the inquiry. Reduced motion opens the form immediately; WebGL is decorative and not required for either path.
 
 - `npm ci` installs dependencies.
 - `npm run dev` serves the site and its Storybook preview.

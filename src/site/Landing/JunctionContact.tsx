@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Copy, t } from '../../i18n/copy';
 import './junction-contact.css';
 
@@ -15,14 +15,34 @@ export function JunctionContact({ onRoute }: { onRoute: RouteSignal }) {
   const [messages, setMessages] = useState({ visionary: '', accelerator: '' });
   const emailRef = useRef<HTMLInputElement>(null), messageRef = useRef<HTMLTextAreaElement>(null);
   const choicesRef = useRef<HTMLDivElement>(null);
+  const consoleRef = useRef<HTMLDivElement>(null), previousTop = useRef<number | null>(null);
   const returning = useRef(false);
   const formId = useId();
   const reply = step === 'reply';
+
+  // Lay out the new panel once. Move the centered hero from its old position
+  // on the compositor rather than relaying out the form on every frame.
+  useLayoutEffect(() => {
+    const from = previousTop.current;
+    previousTop.current = null;
+    if (from === null || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const intro = consoleRef.current?.closest<HTMLElement>('.opal-intro');
+    if (!intro) return;
+    const offset = from - intro.getBoundingClientRect().top;
+    const animation = intro.animate([{ transform: `translateY(${offset}px)` }, { transform: 'none' }],
+      { duration: 280, easing: 'cubic-bezier(.18,.7,.22,1)' });
+    return () => animation.cancel();
+  }, [reply]);
+
+  function rememberPosition() {
+    previousTop.current = consoleRef.current?.closest('.opal-intro')?.getBoundingClientRect().top ?? null;
+  }
 
   function choose(who: JunctionRole, button: HTMLButtonElement) {
     if (step !== 'choose') return;
     setRole(who);
     const origin = (button.querySelector('strong') ?? button).getBoundingClientRect();
+    rememberPosition();
     setStep(onRoute(who, origin) ? 'charge' : 'reply');
   }
   useEffect(() => {
@@ -50,7 +70,7 @@ export function JunctionContact({ onRoute }: { onRoute: RouteSignal }) {
     window.location.assign(`mailto:${inbox}?subject=${encodeURIComponent(t('junction.subject', values))}&body=${encodeURIComponent(t('junction.body', values))}`);
   }
 
-  return <div className="junction-console" data-step={step} data-selected={role}>
+  return <div className="junction-console" data-step={step} data-selected={role} ref={consoleRef}>
     <div className="junction-panel" data-open={!reply} inert={reply} aria-hidden={reply}>
       <div className="junction-clip">
         <div className="junction-choices" ref={choicesRef} role="group" aria-label={t('junction.choose')}>
@@ -68,7 +88,7 @@ export function JunctionContact({ onRoute }: { onRoute: RouteSignal }) {
           <header>
             <h2 id={`${formId}-role`}>{t(`landing.${role}`)}</h2>
             <button type="button" className="junction-back" onClick={() => {
-              returning.current = true; onRoute(null); messageRef.current?.setCustomValidity(''); setStep('choose');
+              rememberPosition(); returning.current = true; onRoute(null); messageRef.current?.setCustomValidity(''); setStep('choose');
             }}>{t('junction.change')}</button>
           </header>
           <label>{t('junction.email')}

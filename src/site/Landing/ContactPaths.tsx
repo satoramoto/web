@@ -4,8 +4,8 @@ import './contact-paths.css';
 export type ContactTreatment = 'original' | 'hairline-edge' | 'quiet-pill' | 'junction' | 'marginalia' | 'keybed';
 
 const paths = [
-  { role: 'visionary', question: 'need', subject: 'I need compute' },
-  { role: 'accelerator', question: 'have', subject: 'I have compute' },
+  { role: 'visionary', question: 'need', subject: 'i need compute' },
+  { role: 'accelerator', question: 'have', subject: 'i have compute' },
 ] as const;
 
 function NoteArrow() {
