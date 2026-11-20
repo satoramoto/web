@@ -140,9 +140,9 @@ export function JunctionContact({ onRoute, sendContact }: { onRoute: RouteSignal
           <footer>
             {!sendContact && <span>{inbox}</span>}
             <button type="submit" className="junction-send" ref={sendRef} aria-disabled={sending || undefined}>
-              <span>{t(sendContact ? 'junction.send' : 'junction.draft')}</span><span className="junction-send-mark" aria-hidden="true">↗</span>
+              <span>{t(sendContact ? 'junction.send' : 'junction.draft')}</span><span className="junction-send-mark" aria-hidden="true" />
             </button>
-            <span className="junction-announcement" role="status">{sending ? t('junction.sending') : ''}</span>
+            <span role="status">{sending ? t('junction.sending') : ''}</span>
           </footer>
         </form>
       </div>

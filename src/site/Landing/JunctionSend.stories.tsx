@@ -42,7 +42,18 @@ async function writeMessage(context: PlayContext) {
 
 export const WritingSurface: Story = {
   args: { sendContact: accepted },
-  play: openForm,
+  play: async context => {
+    await openForm(context);
+    const { canvas } = context;
+    const edge = (role: string, name: string) => canvas.getByRole(role, { name }).getBoundingClientRect();
+    const emailField = edge('textbox', 'your email');
+    const messageField = edge('textbox', 'what are you building?');
+    await expect(emailField.left).toBeCloseTo(messageField.left);
+    await expect(edge('heading', 'visionary').left).toBeCloseTo(messageField.left);
+    await expect(emailField.right).toBeCloseTo(messageField.right);
+    await expect(edge('button', 'change path').right).toBeCloseTo(messageField.right);
+    await expect(edge('button', send).right).toBeCloseTo(messageField.right);
+  },
 };
 
 export const SignalReceived: Story = scenario({
