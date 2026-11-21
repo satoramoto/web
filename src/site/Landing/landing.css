@@ -29,12 +29,24 @@
 .opal-intro { align-self: center; max-width: 42rem; }
 .opal-intro--junction { width: 100%; max-width: none; min-width: 0; }
 .opal-intro h1 { font-size: clamp(2rem, 10vw, 8rem); line-height: .93; letter-spacing: -.075em; margin: 0; }
+.opal-intro--junction h1 { text-shadow: 0 0 1.15rem #d9e6ff26, 0 0 3rem #8babff2b; }
 .opal-tagline { margin: 1rem 0 clamp(2rem, 5vw, 3.75rem); color: #c5c9d1; font-size: clamp(.875rem, 1.6vw, 1.125rem); text-wrap: balance; }
 .opal--observatory { --blue: #89e8da; --red: #ffc294; }
 .opal--observatory .opal-intro { justify-self: center; text-align: center; }
 .opal--observatory h1 { font-weight: 400; letter-spacing: -.055em; }
 .opal--observatory .opal-paths { justify-content: center; }
 .opal--observatory .opal-field { width: 100%; opacity: .48; }
+.opal:has(.junction-console[data-scene="visionary"]) .opal-field {
+  opacity: .68;
+  background: radial-gradient(ellipse at 64% 42%, #172c58, transparent 66%);
+}
+.opal:has(.junction-console[data-scene="accelerator"]) .opal-field {
+  opacity: .68;
+  background: radial-gradient(ellipse at 35% 56%, #46290f, transparent 66%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .opal--observatory .opal-field { transition: opacity 600ms ease; }
+}
 .opal--standing { --blue: #89e8da; --red: #ffc294; }
 .opal--standing .opal-intro { justify-self: end; }
 .opal--standing h1 { font-size: clamp(2rem, 8vw, 6rem); }

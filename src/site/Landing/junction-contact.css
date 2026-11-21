@@ -9,7 +9,7 @@
 }
 .junction-console[data-selected="accelerator"] { --accent: var(--red); }
 .junction-console button { font: inherit; cursor: pointer; }
-.junction-console :is(button, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.junction-console :is(button, input, textarea, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .junction-panel { opacity: 1; }
 .junction-panel[data-open="false"] { display: none; }
 .junction-clip { min-height: 0; overflow: clip; }
@@ -44,29 +44,91 @@
   .opal:has(.opal-intro--junction) { padding-inline: clamp(.75rem, 2vw, 1.25rem); }
 }
 .junction-form {
-  --lead: clamp(.85rem, 3vw, 1.5rem);
-  display: grid; gap: .8rem; margin: .25rem auto; padding: .35rem .35rem .35rem var(--lead);
-  width: min(100% - .5rem, 25rem); box-sizing: border-box; border-left: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  display: grid; gap: clamp(.75rem, 2.5vh, 1.2rem); margin: .25rem auto; padding: .45rem;
+  width: min(100%, 29rem); box-sizing: border-box;
 }
-.junction-form :is(header,footer) { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
-.junction-form h2 { color: var(--accent); font-weight: 500; font-size: 1.125rem; margin: 0; }
-.junction-form label { display: grid; gap: .3rem; font-size: .875rem; color: #d5d9e0; }
 .junction-form :is(input,textarea) {
-  box-sizing: border-box; width: 100%; border: 1px solid #4b515c; border-radius: .25rem;
-  padding: .5rem .65rem; color: var(--ink); background: #0c1015ec; font: inherit; font-size: 1rem; line-height: 1.4; color-scheme: dark;
+  box-sizing: border-box; width: 100%; min-height: 2.75rem; border: 0; border-bottom: 1px solid #737c8a; border-radius: 0;
+  padding: .7rem .75rem; color: var(--ink); background: linear-gradient(0deg, #0b0e13d9, #0b0e1370 70%, transparent);
+  font: inherit; font-size: 1rem; line-height: 1.5; color-scheme: dark;
 }
-.junction-form textarea { resize: vertical; min-height: 3.5rem; }
-.junction-form button { min-height: 2.75rem; }
+.junction-form :is(input,textarea)::placeholder { color: #b3bcc9; opacity: 1; }
+.junction-form :is(input,textarea):focus-visible { outline: none; border-bottom-color: var(--accent); box-shadow: 0 1px var(--accent); }
+.junction-form :is(input,textarea):focus-visible:hover { background-color: #080a1066; }
+.junction-form textarea { resize: vertical; min-height: 4.5rem; }
+.junction-console button { min-height: 2.75rem; }
 .junction-back { border: 0; padding: 0 .2rem; color: var(--metal); background: transparent; text-decoration: underline; text-underline-offset: .2em; }
-.junction-form .junction-back, .junction-form footer { font-size: .8125rem; }
-.junction-form footer { color: var(--metal); }
-.junction-form [type="submit"] { border-radius: .25rem; padding: .4rem .75rem; background: #171b23; color: var(--ink); border: 1px solid #646c79; font-weight: 500; }
-.junction-form [type="submit"]:hover { border-color: var(--accent); }
-@media (max-width: 24rem) {
-  .junction-form footer { flex-direction: column-reverse; align-items: stretch; gap: .4rem; }
-  .junction-form footer > span { text-align: center; }
+.junction-console .junction-back { font-size: .875rem; }
+.junction-form footer {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
+  gap: .25rem .5rem; padding-bottom: .45rem; color: var(--metal); font-size: .875rem;
 }
+.junction-path { position: relative; justify-self: start; }
+.junction-path select {
+  min-height: 2.75rem; appearance: none; font: inherit; color: var(--accent); color-scheme: dark;
+  padding: 0 1.45rem 0 .75rem; border: 0; border-radius: .2rem; background: transparent; cursor: pointer;
+}
+.junction-path select option { color: var(--ink); background: #11151d; }
+.junction-path::after {
+  content: ''; position: absolute; right: .45rem; top: 50%; width: .35rem; height: .35rem;
+  border: solid var(--metal); border-width: 0 1px 1px 0; transform: translateY(-73%) rotate(45deg); pointer-events: none;
+}
+.junction-form .junction-send {
+  grid-column: 2; justify-self: center; position: relative; isolation: isolate;
+  display: inline-flex; align-items: center; justify-content: center; gap: .65rem;
+  border: 0; padding: 0 .4rem; background: transparent;
+  color: var(--ink); font-weight: 500; white-space: nowrap;
+}
+.junction-send::before, .junction-send::after {
+  content: ''; position: absolute; z-index: -1; pointer-events: none; inset: .12rem -.45rem;
+  border: 1px solid var(--accent); border-radius: 50%;
+  mask-image: linear-gradient(90deg, #000, transparent 41% 59%, #000);
+  transform: scale(1.06, .86); opacity: .34;
+}
+.junction-send::after { transform: scale(1.22, 1.12); opacity: .17; }
+.junction-send:is(:hover, :focus-visible)::before,
+.junction-form[data-status="sending"] .junction-send::before { opacity: .56; }
+.junction-send:is(:hover, :focus-visible)::after,
+.junction-form[data-status="sending"] .junction-send::after { opacity: .28; }
+.junction-send > :first-child { text-decoration: underline; text-decoration-color: #737c8a; text-underline-offset: .35em; }
+.junction-send-mark {
+  position: relative; flex: none; width: 1.65rem; height: .75rem;
+  color: var(--accent);
+}
+.junction-send-mark::before {
+  content: ''; position: absolute; inset: 50% .2rem auto 0; height: 1px;
+  background: linear-gradient(to right, transparent, currentColor); opacity: .65;
+}
+.junction-send-mark::after {
+  content: ''; position: absolute; top: 50%; right: .1rem; width: .32rem; height: .32rem;
+  border: 1px solid currentColor; transform: translateY(-50%) rotate(45deg);
+}
+.junction-send:is(:hover, :focus-visible, :active) > :first-child { text-decoration-color: var(--accent); }
+.junction-send:is(:hover, :focus-visible, :active) .junction-send-mark::after,
+.junction-form[data-status="sending"] .junction-send-mark::after { background: currentColor; box-shadow: 0 0 .65rem currentColor; }
+.junction-form[data-status="sending"] .junction-send { cursor: wait; }
+.junction-form[data-status="sending"] .junction-send-mark::before { opacity: 1; }
+.junction-challenge:empty { display: none; }
+.junction-error { color: #ffc6b4; margin: 0; font-size: .875rem; }
+.junction-status, .junction-address { color: var(--metal); margin: 0; font-size: .875rem; }
+.junction-status:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@container (max-width: 27rem) {
+  .junction-form footer { grid-template-columns: minmax(0, 1fr); }
+  .junction-form .junction-send { grid-column: 1; }
+}
+.junction-receipt { text-align: center; display: grid; justify-items: center; gap: .55rem; padding: .5rem; }
+.junction-receipt-label {
+  display: flex; align-items: center; gap: .55rem; margin: 0; color: var(--accent);
+  font: .75rem/1.4 ui-monospace, monospace; letter-spacing: .12em;
+}
+.junction-receipt-label span { width: .45rem; height: .45rem; background: currentColor; box-shadow: 0 0 .8rem currentColor; transform: rotate(45deg); }
+.junction-receipt h2 { font-weight: 400; font-size: clamp(1.6rem, 6cqi, 3rem); line-height: 1.05; letter-spacing: -.045em; margin: 0; text-wrap: balance; }
+.junction-receipt h2:focus { outline: none; }
+.junction-receipt-body { color: var(--metal); margin: 0; font-size: .9375rem; }
 @media (prefers-reduced-motion: no-preference) {
+  .junction-send::before, .junction-send::after { transition: transform 420ms ease-out, opacity 250ms ease-out; }
+  .junction-send:is(:hover, :focus-visible)::before { transform: scale(1.13, .98); }
+  .junction-send:is(:hover, :focus-visible)::after { transform: scale(1.32, 1.27); }
   .junction-panel[data-open="true"] { animation: junction-reveal 190ms ease-out; }
   .junction-console[data-step="charge"] .junction-choices { opacity: 0; transition: opacity 150ms ease-in 190ms; }
   @keyframes junction-reveal { from { opacity: 0; } to { opacity: 1; } }
@@ -76,5 +138,5 @@
   .opal:has(.junction-console[data-step="reply"]) h1 { font-size: clamp(2rem, 8vh, 3rem); }
   .opal:has(.junction-console) .opal-tagline { margin-block: .5rem .8rem; }
   .junction-form { gap: .35rem; }
-  .junction-form textarea { height: 3.5rem; }
+  .junction-form textarea { height: 4rem; min-height: 4rem; }
 }

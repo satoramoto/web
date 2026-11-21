@@ -1,29 +1,17 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { t } from '../../i18n/copy';
 import { ContactPaths, type ContactTreatment } from './ContactPaths';
-import { JunctionContact, type RouteSignal } from './JunctionContact';
+import { JunctionContact, type RouteSignal, type SendContact } from './JunctionContact';
 import './landing.css';
 
 const fragment = `
 precision mediump float;
 uniform vec2 size, mouse, origin;
+uniform vec2 scene; // crossfade weights for blue orbit and gold lanes
 uniform vec3 cool, warm;
 uniform float time, age, mode;
 uniform vec4 ignition; // role word in field coordinates, age (negative at rest), polarity
-void main(){
-  vec2 p=(gl_FragCoord.xy-size*.5)/size.y;
-  float surge=0., crest=0.;
-  if(ignition.z>=0. && ignition.z<1.6){
-    vec2 ray=p-ignition.xy;
-    float radius=length(ray), elapsed=ignition.z;
-    float front=radius-elapsed*(.82+.25*elapsed);
-    float decay=1.-smoothstep(.38,1.6,elapsed);
-    surge=exp(-58.*front*front)*decay;
-    float edge=front/.034;
-    crest=exp(-edge*edge)*decay;
-    // Displace the strands themselves: a single compression front travels out from the chosen word.
-    p-=ray/max(radius,.035)*surge*(.15+.045*cos(20.*front));
-  }
+vec3 observatory(vec2 p, float surge, float crest){
   float r=length(p-origin);
   float ring=r-age*.48;
   float pulse=sin(26.*ring)*exp(-17.*ring*ring)*exp(-age*1.7);
@@ -65,7 +53,58 @@ void main(){
     vec3 rear=.14*(cool*echoA+warm*echoB);
     color+=rear*(1.-smoothstep(.02,.5,coverage));
   }
-  color=color*(1.+3.8*surge)+mix(cool,warm,ignition.w)*(crest*(.22+.85*coverage)+.35*surge*coverage);
+  return color*(1.+3.8*surge)+mix(cool,warm,ignition.w)*(crest*(.22+.85*coverage)+.35*surge*coverage);
+}
+
+// Elliptical fronts drift out of a blue focal point. Distinct arc segments
+// turn at different speeds instead of reusing the default parallel strands.
+vec3 blueOrbit(vec2 p){
+  vec2 q=(p-vec2(.20,.07))*vec2(1.0,1.46);
+  float radius=length(q);
+  float ring=radius*9.2-time*.38;
+  float rim=abs(fract(ring)-.5);
+  float fine=1.-smoothstep(.018,.052,rim);
+  float bloom=.13*(1.-smoothstep(.035,.17,rim));
+  float theta=atan(q.y, q.x+.0001);
+  float arc=.20+.80*smoothstep(-.55,.80,cos(3.*theta-floor(ring)*1.28-time*.55));
+  float sweep=.40+.60*pow(.5+.5*cos(theta-time*.33),3.);
+  float fade=smoothstep(.12,.31,radius)*(1.-smoothstep(.66,1.42,radius));
+  return cool*(.060*exp(-2.5*radius)+fade*(fine+bloom)*arc*sweep*.69);
+}
+
+// Gold is a set of ascending lanes, with packets moving independently down
+// each trace. The slopes and travel are deliberately unlike the blue rings.
+vec3 goldLanes(vec2 p){
+  float rail=(p.y-.42*p.x-.15*p.x*p.x)*12.0;
+  float line=abs(fract(rail)-.5);
+  float fine=1.-smoothstep(.013,.045,line);
+  float bloom=.18*(1.-smoothstep(.04,.18,line));
+  float phase=fract(p.x*1.34-time*.49+floor(rail)*.231);
+  float packet=smoothstep(.07,.23,phase)*(1.-smoothstep(.24,.31,phase));
+  float lengthFade=exp(-.85*dot(p,p));
+  return warm*(.058*lengthFade+(fine+bloom)*(.14+.74*packet)*lengthFade);
+}
+
+void main(){
+  vec2 p=(gl_FragCoord.xy-size*.5)/size.y;
+  vec2 disturbed=p;
+  float surge=0., crest=0.;
+  if(ignition.z>=0. && ignition.z<1.6){
+    vec2 ray=p-ignition.xy;
+    float radius=length(ray), elapsed=ignition.z;
+    float front=radius-elapsed*(.82+.25*elapsed);
+    float decay=1.-smoothstep(.38,1.6,elapsed);
+    surge=exp(-58.*front*front)*decay;
+    float edge=front/.034;
+    crest=exp(-edge*edge)*decay;
+    disturbed-=ray/max(radius,.035)*surge*(.15+.045*cos(20.*front));
+  }
+  float routed=scene.x+scene.y;
+  vec3 color=vec3(0.);
+  if(routed<.999) color=(1.-routed)*observatory(disturbed,surge,crest);
+  if(scene.x>0.) color+=scene.x*blueOrbit(disturbed);
+  if(scene.y>0.) color+=scene.y*goldLanes(disturbed);
+  color+=routed*mix(cool,warm,ignition.w)*(.20*crest+.037*surge);
   gl_FragColor=vec4(color,1.);
 }`;
 
@@ -99,6 +138,11 @@ function Field({ variant, palette, signal }: FieldProps) {
     let frame = 0, hit = -10000, mx = 0, my = 0, ox = 0, oy = 0;
     const stage = canvas.parentElement!;
     let ignitionTime = -Infinity, ix = 0, iy = 0, polarity = 0;
+    let sceneTime = -Infinity, fromBlue = 0, fromGold = 0, toBlue = 0, toGold = 0;
+    const sceneProgress = (now: number) => {
+      const t = motion.matches ? 1 : Math.min(1, Math.max(0, (now - sceneTime) / 680));
+      return t * t * (3 - 2 * t);
+    };
     // The field has soft edges; spend the pixel budget on motion. CSS keeps
     // every letter at native resolution, including on high-DPI phones.
     let cssWidth = canvas.clientWidth, cssHeight = canvas.clientHeight;
@@ -120,9 +164,11 @@ function Field({ variant, palette, signal }: FieldProps) {
       move(event); ox = mx; oy = my; hit = performance.now();
     };
     const start = performance.now();
-    const uniforms = Object.fromEntries(['size', 'mouse', 'origin', 'time', 'age', 'mode', 'ignition'].map(key => [key, gl.getUniformLocation(program, key)]));
+    const uniforms = Object.fromEntries(['size', 'mouse', 'origin', 'time', 'age', 'mode', 'ignition', 'scene'].map(key => [key, gl.getUniformLocation(program, key)]));
     const draw = (now: number) => {
       const elapsed = (now - ignitionTime) / 1000 - .11;
+      const blend = sceneProgress(now);
+      gl.uniform2f(uniforms.scene, fromBlue + (toBlue - fromBlue) * blend, fromGold + (toGold - fromGold) * blend);
       gl.uniform4f(uniforms.ignition, ix, iy, !motion.matches && elapsed < 1.6 ? elapsed : -1, polarity);
       gl.uniform2f(uniforms.mouse, motion.matches ? 0 : mx, motion.matches ? 0 : my);
       gl.uniform2f(uniforms.origin, ox, oy);
@@ -167,13 +213,23 @@ function Field({ variant, palette, signal }: FieldProps) {
       gl.uniform3f(gl.getUniformLocation(program, 'warm'), warm[0], warm[1], warm[2]);
       signal.current = (role, origin) => {
         const box = canvas.getBoundingClientRect();
-        if (!role || !origin || !box.height || motion.matches || gl.isContextLost()) {
+        const now = performance.now();
+        const blue = role === 'visionary' ? 1 : 0, gold = role === 'accelerator' ? 1 : 0;
+        if (blue !== toBlue || gold !== toGold) {
+          const blend = sceneProgress(now);
+          fromBlue += (toBlue - fromBlue) * blend;
+          fromGold += (toGold - fromGold) * blend;
+          toBlue = blue; toGold = gold; sceneTime = now;
+        }
+        if (gl.isContextLost()) return false;
+        if (!role || !origin || !box.height || motion.matches) {
           ignitionTime = -Infinity;
+          if (motion.matches) draw(now);
           return false;
         }
         ix = (origin.left + origin.width / 2 - box.left - box.width / 2) / box.height;
         iy = (box.top + box.height / 2 - origin.top - origin.height / 2) / box.height;
-        ignitionTime = performance.now(); polarity = role === 'accelerator' ? 1 : 0;
+        ignitionTime = now; polarity = gold;
         return true;
       };
       stage.addEventListener('pointermove', move);
@@ -200,9 +256,10 @@ type LandingProps = {
   variant?: 'interference' | 'observatory' | 'standing';
   palette?: keyof typeof palettes;
   labels?: ContactTreatment;
+  sendContact?: SendContact;
 };
 
-export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original' }: LandingProps) {
+export function Landing({ variant = 'interference', palette = variant === 'interference' ? 'blue-red' : 'teal-copper', labels = 'original', sendContact }: LandingProps) {
   const signal = useRef<RouteSignal | null>(null);
   return <main className={`opal opal--${variant} opal-palette--${palette}`}>
     <Field variant={variant} palette={palette} signal={signal} />
@@ -210,7 +267,7 @@ export function Landing({ variant = 'interference', palette = variant === 'inter
       <h1>{t('landing.brand')}</h1>
       <p className="opal-tagline">{t('landing.description')}</p>
       {labels === 'junction'
-        ? <JunctionContact onRoute={(role, origin) => signal.current?.(role, origin) ?? false} />
+        ? <JunctionContact onRoute={(role, origin) => signal.current?.(role, origin) ?? false} sendContact={sendContact} />
         : <ContactPaths treatment={labels} />}
     </section>
   </main>;
