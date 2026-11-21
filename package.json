@@ -28,7 +28,7 @@
     "story-spec": "https://github.com/satoramoto/story-spec/archive/cbfaa1b6d1b5dcb80ae0d03184d46241d96f8a76.tar.gz",
     "storybook": "^10.6.0",
     "typescript": "^7.0.2",
-    "vite": "8.2.2",
+    "vite": "8.3.8",
     "vitest": "^4.1.11"
   },
   "dependencies": {
