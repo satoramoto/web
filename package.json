@@ -26,7 +26,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "playwright": "^1.63.0",
     "story-spec": "https://github.com/satoramoto/story-spec/archive/cbfaa1b6d1b5dcb80ae0d03184d46241d96f8a76.tar.gz",
-    "storybook": "^10.6.0",
+    "storybook": "^10.6.2",
     "typescript": "^7.0.2",
     "vite": "8.2.2",
     "vitest": "^4.1.11"
